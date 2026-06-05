@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Fresh Attendance System</title>
+    <style>
+        :root {
+            --primary: #2ecc71; /* Fresh Green */
+            --primary-dark: #27ae60;
+            --secondary: #34495e; /* Dark Blue-Grey */
+            --bg: #f4f7f6;
+            --white: #ffffff;
+            --danger: #e74c3c;
+            --warning: #f1c40f;
+            --text: #333;
+            --border: #ddd;
+            --shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+        body { background-color: var(--bg); color: var(--text); height: 100vh; overflow-x: hidden; }
+
+        /* --- Utilities --- */
+        .hidden { display: none !important; }
+        .btn { padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-primary:hover { background-color: var(--primary-dark); }
+        .btn-danger { background-color: var(--danger); color: white; }
+        .btn-outline { border: 1px solid var(--border); background: white; color: var(--text); }
+        .flex { display: flex; align-items: center; }
+        .flex-between { justify-content: space-between; }
+        .grid { display: grid; gap: 20px; }
+        
+        /* --- Toast Notification --- */
+        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+        .toast { background: var(--secondary); color: white; padding: 15px 20px; border-radius: 5px; margin-bottom: 10px; box-shadow: var(--shadow); animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+        /* --- Login Section --- */
+        #login-section { height: 100vh; display: flex; justify-content: center; align-items: center; background: linear-gradient(135deg, var(--primary), var(--secondary)); }
+        .login-card { background: white; padding: 40px; border-radius: 10px; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center; }
+        .login-card h2 { margin-bottom: 20px; color: var(--secondary); }
+        .form-group { margin-bottom: 15px; text-align: left; }
+        .form-group label { display: block; margin-bottom: 5px; font-size: 0.9rem; color: #666; }
+        .form-control { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 5px; font-size: 1rem; }
+        .role-toggle { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+        .role-btn { padding: 8px 16px; border: 1px solid var(--primary); background: transparent; color: var(--primary); border-radius: 20px; cursor: pointer; }
+        .role-btn.active { background: var(--primary); color: white; }
+
+        /* --- Layout Structure --- */
+        .dashboard-container { display: flex; flex-direction: column; height: 100vh; }
+        
+        /* --- Header --- */
+        header { background: white; padding: 15px 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; z-index: 100; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary-dark); display: flex; align-items: center; gap: 10px; }
+        .header-actions { position: relative; display: flex; gap: 15px; align-items: center; }
+        
+        /* Dropdown Menu */
+        .menu-container { position: relative; }
+        .menu-dropdown { position: absolute; right: 0; top: 100%; background: white; width: 200px; box-shadow: var(--shadow); border-radius: 5px; overflow: hidden; display: none; flex-direction: column; margin-top: 5px; }
+        .menu-dropdown.show { display: flex; }
+        .menu-item { padding: 12px 15px; text-decoration: none; color: var(--text); cursor: pointer; display: block; }
+        .menu-item:hover { background: #f9f9f9; }
+        .menu-icon { font-size: 1.2rem; cursor: pointer; }
+        
+        /* Notification Badge */
+        .bell-icon { position: relative; cursor: pointer; font-size: 1.2rem; }
+        .badge { position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 50%; }
+
+        /* --- Admin Portal --- */
+        .admin-layout { display: flex; flex: 1; overflow: hidden; }
+        .sidebar { width: 250px; background: var(--secondary); color: white; display: flex; flex-direction: column; }
+        .sidebar nav { padding: 20px 0; }
+        .nav-item { padding: 15px 20px; cursor: pointer; border-left: 4px solid transparent; transition: 0.2s; opacity: 0.8; }
+        .nav-item:hover, .nav-item.active { background: rgba(255,255,255,0.1); border-left-color: var(--primary); opacity: 1; }
+        
+        .main-content { flex: 1; overflow-y: auto; padding: 30px; }
+        
+        /* Tables */
+        .table-container { background: white; padding: 20px; border-radius: 8px; box-shadow: var(--shadow); overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 600px; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #f8f9fa; color: #555; font-weight: 600; }
+        tr:hover { background-color: #fcfcfc; }
+        
+        /* Action Dropdown */
+        .action-cell { position: relative; }
+        .action-btn { background: none; border: none; font-weight: bold; color: var(--primary); cursor: pointer; }
+        .action-menu { position: absolute; right: 0; top: 100%; background: white; border: 1px solid var(--border); box-shadow: var(--shadow); z-index: 10; width: 100px; display: none; }
+        .action-menu.show { display: block; }
+        .action-item { padding: 8px 12px; cursor: pointer; font-size: 0.9rem; }
+        .action-item:hover { background: #f0f0f0; }
+        .action-item.delete { color: var(--danger); }
+
+        /* --- Employee Portal --- */
+        .employee-layout { padding: 20px; max-width: 800px; margin: 0 auto; width: 100%; }
+        .welcome-card { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 20px; }
+        .live-clock { font-size: 2.5rem; font-weight: bold; margin: 10px 0; }
+        .live-date { font-size: 1.1rem; opacity: 0.9; }
+        
+        .attendance-controls { background: white; padding: 20px; border-radius: 10px; box-shadow: var(--shadow); margin-bottom: 20px; text-align: center; }
+        .controls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-top: 20px; }
+        .status-badge { display: inline-block; padding: 5px 12px; border-radius: 15px; font-size: 0.85rem; margin-bottom: 15px; }
+        .status-ok { background: #e8f5e9; color: #2e7d32; }
+        .status-fail { background: #ffebee; color: #c62828; }
+
+        .grid-section { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media(max-width: 768px) { .grid-section { grid-template-columns: 1fr; } .sidebar { display: none; } /* Mobile Admin view simplified for demo */ }
+        
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: var(--shadow); }
+        .card h3 { margin-bottom: 15px; color: var(--secondary); border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        
+        .rating-display { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .rating-bar { height: 8px; background: #eee; border-radius: 4px; margin-top: 5px; overflow: hidden; }
+        .rating-fill { height: 100%; background: var(--warning); width: 0%; transition: width 0.5s; }
+
+        /* --- Modals --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: 0.3s; }
+        .modal-overlay.active { opacity: 1; pointer-events: all; }
+        .modal { background: white; width: 90%; max-width: 500px; padding: 30px; border-radius: 10px; max-height: 90vh; overflow-y: auto; }
+        .modal h2 { margin-bottom: 20px; color: var(--secondary); }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .full-width { grid-column: span 2; }
+        .modal-footer { margin-top: 20px; text-align: right; }
+
+    </style>
+</head>
+<body>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <!-- Login Section -->
+    <section id="login-section">
+        <div class="login-card">
+            <h2>Smart Fresh Portal</h2>
+            <div class="role-toggle">
+                <button class="role-btn active" onclick="setLoginRole('admin')">Admin</button>
+                <button class="role-btn" onclick="setLoginRole('employee')">Employee</button>
+            </div>
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>Email ID / User ID</label>
+                    <input type="text" id="login-id" class="form-control" placeholder="Enter ID" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="login-pass" class="form-control" placeholder="Enter Password" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%">Log In</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Admin Portal -->
+    <section id="admin-portal" class="hidden dashboard-container">
+        <header>
+            <div class="logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                Smart Fresh Admin
+            </div>
+            <div class="header-actions">
+                <div class="bell-icon" onclick="showNotifications()">
+                    🔔 <span id="notif-badge" class="badge hidden">0</span>
+                </div>
+                <div class="menu-container">
+                    <span class="menu-icon" onclick="toggleMenu('admin-menu')">☰</span>
+                    <div id="admin-menu" class="menu-dropdown">
+                        <a class="menu-item" onclick="openAddEmployeeModal()">Add Employee</a>
+                        <a class="menu-item" onclick="logout()">Log Out</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <div class="admin-layout">
+            <aside class="sidebar">
+                <nav>
+                    <div class="nav-item active" onclick="switchAdminTab('home', this)">Home (Employees)</div>
+                    <div class="nav-item" onclick="switchAdminTab('attendance', this)">Attendance Summary</div>
+                    <div class="nav-item" onclick="switchAdminTab('work', this)">Work Summary</div>
+                    <div class="nav-item" onclick="switchAdminTab('salary', this)">Salary</div>
+                </nav>
+            </aside>
+            <main class="main-content" id="admin-content-area">
+                <!-- Content injected via JS -->
+            </main>
+        </div>
+    </section>
+
+    <!-- Employee Portal -->
+    <section id="employee-portal" class="hidden dashboard-container">
+        <header>
+            <div class="logo">Smart Fresh Staff</div>
+            <div class="header-actions">
+                <button class="btn btn-outline" onclick="logout()">Log Out</button>
+            </div>
+        </header>
+        <div class="dashboard-container employee-layout">
+            <div class="welcome-card">
+                <h2 id="emp-welcome-msg">Welcome!</h2>
+                <div style="font-size: 1.1rem; margin-top: 5px;">Shift: <strong id="emp-shift-display" style="color:var(--warning)">Morning</strong></div>
+                <div style="font-size: 1.1rem; margin-top: 5px;">Weekly Off: <strong id="emp-offday-display">Sunday</strong></div>
+                <div class="live-clock" id="clock">00:00:00</div>
+                <div class="live-date" id="date-display">Loading Date...</div>
+            </div>
+
+            <div class="attendance-controls">
+                <h3>Daily Attendance</h3>
+                <div id="location-status" style="margin: 10px 0; font-size: 0.9rem;">Checking location...</div>
+                
+                <div class="controls-grid">
+                    <button id="btn-check-in" class="btn btn-primary" onclick="handleAttendance('checkIn')">Check In</button>
+                    <button id="btn-breakfast-out" class="btn btn-outline" onclick="handleAttendance('breakOut')" disabled>Breakfast Out</button>
+                    <button id="btn-breakfast-in" class="btn btn-outline" onclick="handleAttendance('breakIn')" disabled>Breakfast In</button>
+                    <button id="btn-lunch-out" class="btn btn-outline" onclick="handleAttendance('lunchOut')" disabled>Lunch Out</button>
+                    <button id="btn-lunch-in" class="btn btn-outline" onclick="handleAttendance('lunchIn')" disabled>Lunch In</button>
+                    <button id="btn-check-out" class="btn btn-danger" onclick="handleAttendance('checkOut')" disabled>Check Out</button>
+                </div>
+            </div>
+
+            <div class="grid-section">
+                <div class="card">
+                    <h3>Leave Application</h3>
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="leave-date" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Reason</label>
+                        <textarea id="leave-reason" class="form-control" rows="3" placeholder="Why do you need leave?"></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="submitLeave()">Apply Leave</button>
+                </div>
+                <div class="card">
+                    <h3>Company Suggestions</h3>
+                    <div class="form-group">
+                        <textarea id="suggestion-text" class="form-control" rows="4" placeholder="How can we improve?"></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="submitSuggestion()">Send Feedback</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>My Performance Ratings</h3>
+                <div id="my-ratings-display">
+                    <!-- Injected via JS -->
+                    <p style="color: #777;">No ratings yet.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Add/Edit Employee Modal -->
+    <div id="employee-modal" class="modal-overlay">
+        <div class="modal">
+            <h2 id="modal-title">Add Employee</h2>
+            <form id="employee-form" onsubmit="saveEmployee(event)">
+                <input type="hidden" id="edit-emp-id">
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label>Full Name</label>
+                        <input type="text" id="emp-name" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Father's Name</label>
+                        <input type="text" id="emp-father" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Contact No</label>
+                        <input type="tel" id="emp-contact" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email (Login ID)</label>
+                        <input type="email" id="emp-email" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Date of Birth (Password)</label>
+                        <input type="date" id="emp-dob" class="form-control" required>
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Address</label>
+                        <input type="text" id="emp-address" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Designation</label>
+                        <input type="text" id="emp-designation" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Date of Joining</label>
+                        <input type="date" id="emp-joining" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Salary/Month (₹)</label>
+                        <input type="number" id="emp-salary" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Duty Hrs/Day</label>
+                        <input type="number" id="emp-duty" class="form-control" step="0.5" required>
+                    </div>
+                    <!-- NEW FIELDS -->
+                    <div class="form-group">
+                        <label>Shift</label>
+                        <select id="emp-shift" class="form-control" required>
+                            <option value="morning">Morning (8 AM)</option>
+                            <option value="evening">Evening (12 PM)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Weekly Off Day</label>
+                        <select id="emp-offday" class="form-control" required>
+                            <option value="Sunday">Sunday</option>
+                            <option value="Monday">Monday</option>
+                            <option value="Tuesday">Tuesday</option>
+                            <option value="Wednesday">Wednesday</option>
+                            <option value="Thursday">Thursday</option>
+                            <option value="Friday">Friday</option>
+                            <option value="Saturday">Saturday</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Rate Employee Modal -->
+    <div id="rating-modal" class="modal-overlay">
+        <div class="modal">
+            <h2>Rate Employee</h2>
+            <h4 id="rating-emp-name" style="margin-bottom: 15px; color: var(--primary);"></h4>
+            <input type="hidden" id="rating-emp-id">
+            <div class="form-group">
+                <label>Behavior (1-10)</label>
+                <input type="range" id="rate-behavior" min="1" max="10" value="5" oninput="this.nextElementSibling.value = this.value">
+                <output>5</output>
+            </div>
+            <div class="form-group">
+                <label>Sales Performance (1-10)</label>
+                <input type="range" id="rate-sales" min="1" max="10" value="5" oninput="this.nextElementSibling.value = this.value">
+                <output>5</output>
+            </div>
+            <div class="form-group">
+                <label>Work Performance (1-10)</label>
+                <input type="range" id="rate-work" min="1" max="10" value="5" oninput="this.nextElementSibling.value = this.value">
+                <output>5</output>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('rating-modal').classList.remove('active')">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveRating()">Submit Rating</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- 1. IMPORT FIREBASE SDK (Updated for HTML) ---
+        // I changed the links to full URLs so it works in a single HTML file
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, where, getDocs, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // --- 2. YOUR FIREBASE CONFIGURATION (Integrated) ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyDlCcrwiDjFlhQdPQIMjssbd48Q1xEn1AQ",
+          authDomain: "smart-fresh-eb255.firebaseapp.com",
+          projectId: "smart-fresh-eb255",
+          storageBucket: "smart-fresh-eb255.firebasestorage.app",
+          messagingSenderId: "308076858003",
+          appId: "1:308076858003:web:d697c4996838626a079b66",
+          measurementId: "G-G3EKERV9TD"
+        };
+
+        // --- 3. INITIALIZE FIREBASE ---
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const db = getFirestore(app);
+
+        // --- 4. APP STATE & CONSTANTS ---
+        const ADMIN_CREDS = { id: 'smartfresh@gmail.com', pass: 'Smart@123' };
+        
+        // FINAL LOCATION: Smart Fresh Coordinates
+        const TARGET_LATITUDE = 22.85253224715957; 
+        const TARGET_LONGITUDE = 88.8115659702526;
+        const ALLOWED_RADIUS = 100; // meters
+
+        // Local State Cache (populated from Firebase)
+        let employees = [];
+        let attendance = [];
+        let leaves = [];
+        let notifications = [];
+        let ratings = {};
+
+        let currentUser = null;
+        let loginRole = 'admin';
+        let locationAllowed = false;
+
+        // --- 5. INITIALIZATION & LISTENERS ---
+        
+        // Helper to attach real-time listeners
+        function initListeners() {
+            // Listen to Employees
+            onSnapshot(collection(db, "employees"), (snapshot) => {
+                employees = [];
+                snapshot.forEach(doc => {
+                    employees.push({ id: doc.id, ...doc.data() });
+                });
+                // If Admin is logged in, refresh UI
+                if(currentUser && currentUser.role === 'admin') {
+                    const content = document.getElementById('admin-content-area');
+                    // Basic check to see which tab is active to refresh it
+                    const activeTab = document.querySelector('.nav-item.active');
+                    if(activeTab && activeTab.textContent.includes('Home')) renderHomeTable(content);
+                }
+                if(currentUser && currentUser.role === 'employee') {
+                    // Refresh employee view if needed
+                    renderMyRatings();
+                }
+            });
+
+            // Listen to Attendance
+            onSnapshot(collection(db, "attendance"), (snapshot) => {
+                attendance = [];
+                snapshot.forEach(doc => {
+                    attendance.push({ id: doc.id, ...doc.data() });
+                });
+                // Update button states if employee is viewing
+                if(currentUser && currentUser.role === 'employee') {
+                    setButtonStates();
+                }
+            });
+
+            // Listen to Leaves
+            onSnapshot(collection(db, "leaves"), (snapshot) => {
+                leaves = [];
+                snapshot.forEach(doc => {
+                    leaves.push({ id: doc.id, ...doc.data() });
+                });
+            });
+
+            // Listen to Notifications
+            onSnapshot(collection(db, "notifications"), (snapshot) => {
+                notifications = [];
+                snapshot.forEach(doc => {
+                    notifications.push({ id: doc.id, ...doc.data() });
+                });
+                updateNotificationBadge();
+            });
+
+            // Listen to Ratings
+            onSnapshot(collection(db, "ratings"), (snapshot) => {
+                ratings = {};
+                snapshot.forEach(doc => {
+                    ratings[doc.id] = doc.data();
+                });
+            });
+        }
+
+        function init() {
+            initListeners();
+            setInterval(updateClock, 1000);
+            updateClock();
+            
+            if (!navigator.geolocation) showToast('Geolocation not supported.', 'error');
+
+            // Dropdown Logic
+            window.onclick = function(event) {
+                if (!event.target.matches('.menu-icon')) {
+                    document.querySelectorAll(".menu-dropdown").forEach(el => el.classList.remove('show'));
+                }
+                if (!event.target.matches('.action-btn') && !event.target.matches('.action-item')) {
+                    document.querySelectorAll(".action-menu").forEach(el => el.classList.remove('show'));
+                }
+            };
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const clockEl = document.getElementById('clock');
+            if(clockEl) clockEl.textContent = now.toLocaleTimeString();
+            
+            const dateEl = document.getElementById('date-display');
+            if(dateEl) dateEl.textContent = now.toDateString();
+        }
+
+        function showToast(msg, type = 'success') {
+            const container = document.getElementById('toast-container');
+            if(!container) return;
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.style.backgroundColor = type === 'error' ? 'var(--danger)' : 'var(--secondary)';
+            toast.textContent = msg;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        function updateNotificationBadge() {
+            const badge = document.getElementById('notif-badge');
+            if(badge) {
+                if (notifications.length > 0) {
+                    badge.textContent = notifications.length;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+            }
+        }
+
+        // --- 6. GEOLOCATION HELPER ---
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; 
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180;
+            const Δλ = (lon2-lon1) * Math.PI/180;
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function sendNotification(text) {
+            addDoc(collection(db, "notifications"), {
+                text, 
+                time: new Date().toLocaleString(),
+                timestamp: serverTimestamp() 
+            });
+        }
+
+        // --- 7. LOGIN LOGIC ---
+        function setLoginRole(role) {
+            loginRole = role;
+            document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('login-id').value = '';
+            document.getElementById('login-pass').value = '';
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const id = document.getElementById('login-id').value.trim();
+            const pass = document.getElementById('login-pass').value.trim();
+
+            if (loginRole === 'admin') {
+                if (id === ADMIN_CREDS.id && pass === ADMIN_CREDS.pass) {
+                    currentUser = { role: 'admin', name: 'Administrator' };
+                    showAdminPortal();
+                } else {
+                    showToast('Invalid Admin Credentials', 'error');
+                }
+            } else {
+                // Find employee in Firebase
+                const q = query(collection(db, "employees"), where("email", "==", id));
+                const querySnapshot = await getDocs(q);
+                
+                let foundEmp = null;
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    // Check password (supports YYYY-MM-DD and YYYYMMDD)
+                    const cleanPass = pass.replace(/-/g, '');
+                    if (data.dob.replace(/-/g, '') === cleanPass) {
+                        foundEmp = { id: doc.id, ...data };
+                    }
+                });
+
+                if (foundEmp) {
+                    currentUser = foundEmp;
+                    showEmployeePortal();
+                } else {
+                    showToast('Invalid Employee Credentials', 'error');
+                }
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            document.getElementById('admin-portal').classList.add('hidden');
+            document.getElementById('employee-portal').classList.add('hidden');
+            document.getElementById('login-section').classList.remove('hidden');
+        }
+
+        // --- 8. ADMIN PORTAL LOGIC ---
+        function showAdminPortal() {
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('admin-portal').classList.remove('hidden');
+            switchAdminTab('home');
+        }
+
+        function showNotifications() {
+            let msg = "No new notifications.";
+            if (notifications.length > 0) {
+                msg = notifications.map(n => `[${n.time}] ${n.text}`).join('\n');
+            }
+            alert(msg);
+        }
+
+        function toggleMenu(id) {
+            const el = document.getElementById(id);
+            el.classList.toggle('show');
+        }
+
+        function switchAdminTab(tabName, navEl = null) {
+            if (navEl) {
+                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                navEl.classList.add('active');
+            }
+            const content = document.getElementById('admin-content-area');
+            content.innerHTML = '';
+
+            if (tabName === 'home') renderHomeTable(content);
+            if (tabName === 'attendance') renderAttendanceSummary(content);
+            if (tabName === 'work') renderWorkSummary(content);
+            if (tabName === 'salary') renderSalaryTab(content);
+        }
+
+        // --- Render Functions ---
+
+        function renderHomeTable(container) {
+            let html = `<div class="table-container"><h3>Employee List</h3><table><thead><tr><th>ID</th><th>Name</th><th>Designation</th><th>Shift</th><th>Contact</th><th>Actions</th></tr></thead><tbody>`;
+            employees.forEach(emp => {
+                html += `<tr>
+                    <td>${emp.id}</td>
+                    <td>${emp.name}</td>
+                    <td>${emp.designation}</td>
+                    <td>${emp.shift === 'morning' ? 'Morning' : 'Evening'}</td>
+                    <td>${emp.contact}</td>
+                    <td class="action-cell">
+                        <button class="action-btn" onclick="toggleActionMenu('${emp.id}')">⋮</button>
+                        <div id="act-${emp.id}" class="action-menu">
+                            <div class="action-item" onclick="editEmployee('${emp.id}')">Edit</div>
+                            <div class="action-item delete" onclick="deleteEmployee('${emp.id}')">Delete</div>
+                            <div class="action-item" onclick="openRatingModal('${emp.id}')">Rate</div>
+                        </div>
+                    </td>
+                </tr>`;
+            });
+            html += `</tbody></table></div>`;
+            container.innerHTML = html;
+        }
+
+        function toggleActionMenu(id) {
+            document.querySelectorAll('.action-menu').forEach(m => m.classList.remove('show'));
+            const menu = document.getElementById(`act-${id}`);
+            if(menu) menu.classList.add('show');
+        }
+
+        // --- CRUD OPERATIONS (FIREBASE) ---
+
+        function openAddEmployeeModal() {
+            document.getElementById('employee-form').reset();
+            document.getElementById('edit-emp-id').value = '';
+            document.getElementById('modal-title').textContent = 'Add Employee';
+            document.getElementById('employee-modal').classList.add('active');
+            toggleMenu('admin-menu');
+        }
+
+        function closeModal() {
+            document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+        }
+
+        async function saveEmployee(e) {
+            e.preventDefault();
+            const editId = document.getElementById('edit-emp-id').value;
+            
+            const rawDob = document.getElementById('emp-dob').value;
+            const formattedDob = rawDob.replace(/-/g, '');
+
+            const data = {
+                name: document.getElementById('emp-name').value,
+                father: document.getElementById('emp-father').value,
+                contact: document.getElementById('emp-contact').value,
+                email: document.getElementById('emp-email').value,
+                dob: formattedDob,
+                address: document.getElementById('emp-address').value,
+                designation: document.getElementById('emp-designation').value,
+                joining: document.getElementById('emp-joining').value,
+                salary: parseFloat(document.getElementById('emp-salary').value),
+                dutyHrs: parseFloat(document.getElementById('emp-duty').value),
+                shift: document.getElementById('emp-shift').value,
+                weeklyOff: document.getElementById('emp-offday').value
+            };
+
+            try {
+                if (editId) {
+                    // Update
+                    await updateDoc(doc(db, "employees", editId), data);
+                    showToast('Employee Updated');
+                } else {
+                    // Add
+                    // Custom ID Generation
+                    const doj = data.joining;
+                    const dateStr = doj.replace(/-/g, '').substring(2);
+                    
+                    // Check existing count in Firebase for this prefix
+                    const q = query(collection(db, "employees"), where("id", ">=", dateStr));
+                    const querySnapshot = await getDocs(q);
+                    const count = querySnapshot.size; 
+                    // Note: This counts global matches. For strict date prefix count:
+                    // We filter the docs in memory (or further refine query)
+                    const matches = querySnapshot.docs.filter(d => d.id.startsWith(dateStr));
+                    const serial = (matches.length + 1).toString().padStart(2, '0');
+                    const customId = dateStr + serial;
+                    
+                    await setDoc(doc(db, "employees", customId), { id: customId, ...data });
+                    showToast('Employee Added');
+                }
+                closeModal();
+                switchAdminTab('home');
+            } catch (err) {
+                console.error(err);
+                showToast('Error saving employee', 'error');
+            }
+        }
+
+        async function editEmployee(id) {
+            const emp = employees.find(e => e.id === id);
+            if(!emp) return;
+
+            document.getElementById('edit-emp-id').value = emp.id;
+            document.getElementById('emp-name').value = emp.name;
+            document.getElementById('emp-father').value = emp.father;
+            document.getElementById('emp-contact').value = emp.contact;
+            document.getElementById('emp-email').value = emp.email;
+            
+            // Convert YYYYMMDD back to YYYY-MM-DD for Date Input
+            if (emp.dob && emp.dob.length === 8) {
+                document.getElementById('emp-dob').value = `${emp.dob.substring(0,4)}-${emp.dob.substring(4,6)}-${emp.dob.substring(6,8)}`;
+            } else {
+                document.getElementById('emp-dob').value = emp.dob;
+            }
+
+            document.getElementById('emp-address').value = emp.address;
+            document.getElementById('emp-designation').value = emp.designation;
+            document.getElementById('emp-joining').value = emp.joining;
+            document.getElementById('emp-salary').value = emp.salary;
+            document.getElementById('emp-duty').value = emp.dutyHrs;
+            document.getElementById('emp-shift').value = emp.shift || 'morning';
+            document.getElementById('emp-offday').value = emp.weeklyOff || 'Sunday';
+            
+            document.getElementById('modal-title').textContent = 'Edit Employee';
+            document.getElementById('employee-modal').classList.add('active');
+        }
+
+        async function deleteEmployee(id) {
+            if (confirm('Are you sure?')) {
+                try {
+                    await deleteDoc(doc(db, "employees", id));
+                    showToast('Employee Deleted');
+                } catch (err) {
+                    showToast('Error deleting', 'error');
+                }
+            }
+        }
+
+        // --- RATINGS ---
+        function openRatingModal(id) {
+            const emp = employees.find(e => e.id === id);
+            if(!emp) return;
+            document.getElementById('rating-emp-id').value = id;
+            document.getElementById('rating-emp-name').textContent = emp.name;
+            const r = ratings[id] || { behavior: 5, sales: 5, work: 5 };
+            
+            document.getElementById('rate-behavior').value = r.behavior;
+            document.getElementById('rate-behavior').nextElementSibling.value = r.behavior;
+            document.getElementById('rate-sales').value = r.sales;
+            document.getElementById('rate-sales').nextElementSibling.value = r.sales;
+            document.getElementById('rate-work').value = r.work;
+            document.getElementById('rate-work').nextElementSibling.value = r.work;
+            
+            document.getElementById('rating-modal').classList.add('active');
+        }
+
+        async function saveRating() {
+            const id = document.getElementById('rating-emp-id').value;
+            const data = {
+                behavior: parseInt(document.getElementById('rate-behavior').value),
+                sales: parseInt(document.getElementById('rate-sales').value),
+                work: parseInt(document.getElementById('rate-work').value)
+            };
+            try {
+                await setDoc(doc(db, "ratings", id), data, { merge: true });
+                document.getElementById('rating-modal').classList.remove('active');
+                showToast('Rating Submitted');
+            } catch (err) {
+                showToast('Error saving rating', 'error');
+            }
+        }
+
+        // --- ADMIN: TABS LOGIC ---
+        function renderAttendanceSummary(container) {
+            let html = `<div class="table-container"><h3>Attendance Summary</h3><table><thead><tr><th>ID</th><th>Name</th><th>Presents</th><th>Leaves</th></tr></thead><tbody>`;
+            employees.forEach(emp => {
+                const presents = attendance.filter(a => a.empId === emp.id && a.checkOut).length;
+                const leaves = leaves.filter(l => l.empId === emp.id && l.status === 'Approved').length;
+                html += `<tr><td>${emp.id}</td><td>${emp.name}</td><td>${presents}</td><td>${leaves}</td></tr>`;
+            });
+            html += `</tbody></table></div>`;
+            container.innerHTML = html;
+        }
+
+        function renderWorkSummary(container) {
+            let html = `<div class="table-container"><h3>Work Summary</h3><table><thead><tr><th>ID</th><th>Name</th><th>Total Work Hrs</th><th>Total Break Hrs</th><th>Late</th><th>OT</th></tr></thead><tbody>`;
+            employees.forEach(emp => {
+                let totalWork = 0, totalBreak = 0, lateCount = 0, otTotal = 0;
+                attendance.filter(a => a.empId === emp.id && a.checkOut).forEach(rec => {
+                    totalWork += rec.workHrs || 0;
+                    totalBreak += rec.breakHrs || 0;
+                    if(rec.isLate) lateCount++;
+                    otTotal += rec.ot || 0;
+                });
+                html += `<tr>
+                    <td>${emp.id}</td><td>${emp.name}</td>
+                    <td>${totalWork.toFixed(2)} hrs</td>
+                    <td>${totalBreak.toFixed(2)} hrs</td>
+                    <td>${lateCount}</td>
+                    <td>${otTotal.toFixed(2)} hrs</td>
+                </tr>`;
+            });
+            html += `</tbody></table></div>`;
+            container.innerHTML = html;
+        }
+
+        function renderSalaryTab(container) {
+            let html = `<div class="table-container"><h3>Salary Details</h3><table><thead><tr><th>ID</th><th>Name</th><th>Hrs</th><th>OT</th><th>Late</th><th>Calc Salary (₹)</th><th>Status</th></tr></thead><tbody>`;
+            employees.forEach(emp => {
+                let totalWork = 0, totalOT = 0, lateCount = 0;
+                attendance.filter(a => a.empId === emp.id && a.checkOut).forEach(rec => {
+                    totalWork += rec.workHrs || 0;
+                    totalOT += rec.ot || 0;
+                    if(rec.isLate) lateCount++;
+                });
+                const daysInMonth = 26; // Paid weekly off adjustment
+                const hourlyRate = emp.salary / (daysInMonth * emp.dutyHrs);
+                const standardWorkHrs = totalWork - totalOT;
+                const standardPay = standardWorkHrs * hourlyRate;
+                const otPay = totalOT * (hourlyRate * 1.5);
+                const lateDeduction = lateCount * 50;
+                const finalSalary = standardPay + otPay - lateDeduction;
+                const displaySalary = finalSalary > 0 ? finalSalary.toFixed(2) : "0.00";
+                html += `<tr>
+                    <td>${emp.id}</td><td>${emp.name}</td>
+                    <td>${totalWork.toFixed(2)}</td>
+                    <td>${totalOT.toFixed(2)}</td>
+                    <td style="color:${lateCount > 0 ? 'red' : 'inherit'}">${lateCount}</td>
+                    <td><strong>₹${displaySalary}</strong></td>
+                    <td><span style="color:orange">Pending</span></td>
+                </tr>`;
+            });
+            html += `</tbody></table></div>`;
+            container.innerHTML = html;
+        }
+
+        // --- EMPLOYEE PORTAL LOGIC ---
+        function showEmployeePortal() {
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('employee-portal').classList.remove('hidden');
+            document.getElementById('emp-welcome-msg').textContent = `Welcome, ${currentUser.name}`;
+            
+            document.getElementById('emp-shift-display').textContent = currentUser.shift === 'morning' ? 'Morning (8 AM)' : 'Evening (12 PM)';
+            document.getElementById('emp-offday-display').textContent = currentUser.weeklyOff;
+            
+            checkLocationStatus();
+            renderMyRatings();
+            setButtonStates();
+        }
+
+        function checkLocationStatus() {
+            if (!navigator.geolocation) {
+                document.getElementById('location-status').innerHTML = '<span class="status-fail status-badge">Geolocation not supported</span>';
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const dist = calculateDistance(position.coords.latitude, position.coords.longitude, TARGET_LATITUDE, TARGET_LONGITUDE);
+                    const el = document.getElementById('location-status');
+                    if (dist <= ALLOWED_RADIUS) {
+                        locationAllowed = true;
+                        el.innerHTML = `<span class="status-ok status-badge">✓ You are at the Store (${Math.round(dist)}m)</span>`;
+                    } else {
+                        locationAllowed = false;
+                        el.innerHTML = `<span class="status-fail status-badge">✗ Out of Radius (${Math.round(dist)}m). Max 100m allowed.</span>`;
+                    }
+                },
+                () => {
+                    locationAllowed = false;
+                    document.getElementById('location-status').innerHTML = '<span class="status-fail status-badge">Location access denied</span>';
+                }
+            );
+        }
+
+        function setButtonStates() {
+            const todayStr = new Date().toISOString().slice(0,10);
+            const rec = attendance.find(a => a.empId === currentUser.id && a.date === todayStr);
+            const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+
+            // Weekly Off Check
+            if (todayDayName === currentUser.weeklyOff) {
+                // It's weekly off, disable everything and show message
+                document.getElementById('btn-check-in').disabled = true;
+                document.getElementById('btn-check-in').textContent = "Weekly Off";
+                document.getElementById('btn-check-in').classList.remove('btn-primary');
+                document.getElementById('btn-check-in').classList.add('btn-outline');
+                
+                // Disable others
+                ['btn-breakfast-out', 'btn-breakfast-in', 'btn-lunch-out', 'btn-lunch-in', 'btn-check-out'].forEach(id => {
+                    document.getElementById(id).disabled = true;
+                });
+                return;
+            } else {
+                // Reset button text if it was changed
+                document.getElementById('btn-check-in').textContent = "Check In";
+                document.getElementById('btn-check-in').classList.add('btn-primary');
+                document.getElementById('btn-check-in').classList.remove('btn-outline');
+            }
+
+            const btns = {
+                in: document.getElementById('btn-check-in'),
+                bOut: document.getElementById('btn-breakfast-out'),
+                bIn: document.getElementById('btn-breakfast-in'),
+                lOut: document.getElementById('btn-lunch-out'),
+                lIn: document.getElementById('btn-lunch-in'),
+                out: document.getElementById('btn-check-out')
+            };
+
+            Object.values(btns).forEach(b => b.disabled = true);
+
+            if (!rec) {
+                if (locationAllowed) btns.in.disabled = false;
+            } else {
+                btns.in.disabled = true;
+                if (!rec.breakOut) btns.bOut.disabled = false;
+                else if (!rec.breakIn) btns.bIn.disabled = false;
+                else if (!rec.lunchOut) btns.lOut.disabled = false;
+                else if (!rec.lunchIn) btns.lIn.disabled = false;
+                else if (!rec.checkOut) btns.out.disabled = false;
+            }
+        }
+
+        async function handleAttendance(type) {
+            if (!locationAllowed) {
+                showToast('You must be within 100m of the store!', 'error');
+                checkLocationStatus();
+                return;
+            }
+
+            const todayStr = new Date().toISOString().slice(0,10);
+            let rec = attendance.find(a => a.empId === currentUser.id && a.date === todayStr);
+            const now = new Date();
+
+            if (type === 'checkIn') {
+                if (rec) return;
+                rec = {
+                    empId: currentUser.id,
+                    date: todayStr,
+                    checkIn: now.toISOString(),
+                    breakOut: null, breakIn: null,
+                    lunchOut: null, lunchIn: null,
+                    checkOut: null,
+                    workHrs: 0, breakHrs: 0, ot: 0, isLate: false
+                };
+                
+                // NEW: Shift Based Late Logic
+                const hour = now.getHours();
+                const minute = now.getMinutes();
+                let isLate = false;
+
+                if (currentUser.shift === 'morning') {
+                    // Morning: Late if > 8:15 AM
+                    if (hour > 8 || (hour === 8 && minute > 15)) {
+                        isLate = true;
+                    }
+                } else {
+                    // Evening: Late if > 12:15 PM
+                    if (hour > 12 || (hour === 12 && minute > 15)) {
+                        isLate = true;
+                    }
+                }
+                rec.isLate = isLate;
+                
+                await addDoc(collection(db, "attendance"), rec);
+                sendNotification(`${currentUser.name} Checked In.`);
+                showToast('Checked In Successfully');
+            } else {
+                if (rec) {
+                    if (type === 'breakOut') rec.breakOut = now.toISOString();
+                    if (type === 'breakIn') rec.breakIn = now.toISOString();
+                    if (type === 'lunchOut') rec.lunchOut = now.toISOString();
+                    if (type === 'lunchIn') rec.lunchIn = now.toISOString();
+                    
+                    if (type === 'checkOut') {
+                        rec.checkOut = now.toISOString();
+                        
+                        const start = new Date(rec.checkIn);
+                        const end = new Date(rec.checkOut);
+                        let totalMs = end - start;
+                        
+                        let breakMs = 0;
+                        if(rec.breakOut && rec.breakIn) breakMs += (new Date(rec.breakIn) - new Date(rec.breakOut));
+                        if(rec.lunchOut && rec.lunchIn) breakMs += (new Date(rec.lunchIn) - new Date(rec.lunchOut));
+                        
+                        rec.workHrs = (totalMs - breakMs) / (1000 * 60 * 60);
+                        rec.breakHrs = breakMs / (1000 * 60 * 60);
+                        
+                        const dutyHrs = currentUser.dutyHrs || 8;
+                        if (rec.workHrs > dutyHrs) {
+                            rec.ot = rec.workHrs - dutyHrs;
+                        }
+                        
+                        // Update the specific doc in DB
+                        const q = query(collection(db, "attendance"), where("empId", "==", currentUser.id), where("date", "==", todayStr));
+                        const snap = await getDocs(q);
+                        if(!snap.empty) {
+                            const docId = snap.docs[0].id;
+                            await updateDoc(doc(db, "attendance", docId), rec);
+                            sendNotification(`${currentUser.name} Checked Out. Work: ${rec.workHrs.toFixed(2)}h`);
+                        }
+                    }
+                }
+            }
+        }
+
+        async function submitLeave() {
+            const date = document.getElementById('leave-date').value;
+            const reason = document.getElementById('leave-reason').value;
+            if (!date || !reason) return showToast('Please fill all fields', 'error');
+
+            await addDoc(collection(db, "leaves"), {
+                empId: currentUser.id,
+                date: date,
+                reason: reason,
+                status: 'Pending'
+            });
+            
+            sendNotification(`${currentUser.name} applied for leave on ${date}`);
+            showToast('Leave Application Sent');
+            document.getElementById('leave-reason').value = '';
+        }
+
+        async function submitSuggestion() {
+            const txt = document.getElementById('suggestion-text').value;
+            if (!txt) return showToast('Write something first', 'error');
+            sendNotification(`Suggestion from ${currentUser.name}: ${txt}`);
+            showToast('Feedback Sent');
+            document.getElementById('suggestion-text').value = '';
+        }
+
+        function renderMyRatings() {
+            const container = document.getElementById('my-ratings-display');
+            const r = ratings[currentUser.id];
+            if (!r) {
+                container.innerHTML = '<p>No ratings available yet.</p>';
+                return;
+            }
+            container.innerHTML = `
+                <div class="rating-display"><span>Behavior</span><span>${r.behavior}/10</span></div>
+                <div class="rating-bar"><div class="rating-fill" style="width:${r.behavior*10}%"></div></div>
+                <div class="rating-display" style="margin-top:15px"><span>Sales</span><span>${r.sales}/10</span></div>
+                <div class="rating-bar"><div class="rating-fill" style="width:${r.sales*10}%"></div></div>
+                <div class="rating-display" style="margin-top:15px"><span>Work</span><span>${r.work}/10</span></div>
+                <div class="rating-bar"><div class="rating-fill" style="width:${r.work*10}%"></div></div>
+            `;
+        }
+
+        // --- Run ---
+        init();
+    </script>
+</body>
+</html>
