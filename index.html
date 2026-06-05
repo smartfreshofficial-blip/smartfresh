@@ -355,30 +355,8 @@
         </div>
     </div>
 
-    <script type="module">
-        // --- 1. IMPORT FIREBASE SDK (Updated for HTML) ---
-        // I changed the links to full URLs so it works in a single HTML file
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, where, getDocs, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-        // --- 2. YOUR FIREBASE CONFIGURATION (Integrated) ---
-        const firebaseConfig = {
-          apiKey: "AIzaSyDlCcrwiDjFlhQdPQIMjssbd48Q1xEn1AQ",
-          authDomain: "smart-fresh-eb255.firebaseapp.com",
-          projectId: "smart-fresh-eb255",
-          storageBucket: "smart-fresh-eb255.firebasestorage.app",
-          messagingSenderId: "308076858003",
-          appId: "1:308076858003:web:d697c4996838626a079b66",
-          measurementId: "G-G3EKERV9TD"
-        };
-
-        // --- 3. INITIALIZE FIREBASE ---
-        const app = initializeApp(firebaseConfig);
-        const analytics = getAnalytics(app);
-        const db = getFirestore(app);
-
-        // --- 4. APP STATE & CONSTANTS ---
+    <script>
+        // --- Configuration & State ---
         const ADMIN_CREDS = { id: 'smartfresh@gmail.com', pass: 'Smart@123' };
         
         // FINAL LOCATION: Smart Fresh Coordinates
@@ -386,108 +364,68 @@
         const TARGET_LONGITUDE = 88.8115659702526;
         const ALLOWED_RADIUS = 100; // meters
 
-        // Local State Cache (populated from Firebase)
-        let employees = [];
-        let attendance = [];
-        let leaves = [];
-        let notifications = [];
-        let ratings = {};
+        // Database Simulation
+        let db = {
+            employees: JSON.parse(localStorage.getItem('sf_employees')) || [],
+            attendance: JSON.parse(localStorage.getItem('sf_attendance')) || [],
+            leaves: JSON.parse(localStorage.getItem('sf_leaves')) || [],
+            notifications: JSON.parse(localStorage.getItem('sf_notifications')) || [],
+            ratings: JSON.parse(localStorage.getItem('sf_ratings')) || {}
+        };
 
         let currentUser = null;
-        let loginRole = 'admin';
+        let loginRole = 'admin'; // 'admin' or 'employee'
         let locationAllowed = false;
 
-        // --- 5. INITIALIZATION & LISTENERS ---
-        
-        // Helper to attach real-time listeners
-        function initListeners() {
-            // Listen to Employees
-            onSnapshot(collection(db, "employees"), (snapshot) => {
-                employees = [];
-                snapshot.forEach(doc => {
-                    employees.push({ id: doc.id, ...doc.data() });
-                });
-                // If Admin is logged in, refresh UI
-                if(currentUser && currentUser.role === 'admin') {
-                    const content = document.getElementById('admin-content-area');
-                    // Basic check to see which tab is active to refresh it
-                    const activeTab = document.querySelector('.nav-item.active');
-                    if(activeTab && activeTab.textContent.includes('Home')) renderHomeTable(content);
-                }
-                if(currentUser && currentUser.role === 'employee') {
-                    // Refresh employee view if needed
-                    renderMyRatings();
-                }
-            });
-
-            // Listen to Attendance
-            onSnapshot(collection(db, "attendance"), (snapshot) => {
-                attendance = [];
-                snapshot.forEach(doc => {
-                    attendance.push({ id: doc.id, ...doc.data() });
-                });
-                // Update button states if employee is viewing
-                if(currentUser && currentUser.role === 'employee') {
-                    setButtonStates();
-                }
-            });
-
-            // Listen to Leaves
-            onSnapshot(collection(db, "leaves"), (snapshot) => {
-                leaves = [];
-                snapshot.forEach(doc => {
-                    leaves.push({ id: doc.id, ...doc.data() });
-                });
-            });
-
-            // Listen to Notifications
-            onSnapshot(collection(db, "notifications"), (snapshot) => {
-                notifications = [];
-                snapshot.forEach(doc => {
-                    notifications.push({ id: doc.id, ...doc.data() });
-                });
-                updateNotificationBadge();
-            });
-
-            // Listen to Ratings
-            onSnapshot(collection(db, "ratings"), (snapshot) => {
-                ratings = {};
-                snapshot.forEach(doc => {
-                    ratings[doc.id] = doc.data();
-                });
-            });
-        }
-
+        // --- Initialization ---
         function init() {
-            initListeners();
             setInterval(updateClock, 1000);
             updateClock();
+            requestNotificationPermission();
             
-            if (!navigator.geolocation) showToast('Geolocation not supported.', 'error');
+            // Geolocation Warning
+            if (!navigator.geolocation) {
+                showToast('Geolocation is not supported by your browser.', 'error');
+            }
 
-            // Dropdown Logic
+            // Dropdown Click-Outside Logic
             window.onclick = function(event) {
+                // Close Admin Menu
                 if (!event.target.matches('.menu-icon')) {
-                    document.querySelectorAll(".menu-dropdown").forEach(el => el.classList.remove('show'));
+                    var dropdowns = document.getElementsByClassName("menu-dropdown");
+                    for (var i = 0; i < dropdowns.length; i++) {
+                        var openDropdown = dropdowns[i];
+                        if (openDropdown.classList.contains('show')) {
+                            openDropdown.classList.remove('show');
+                        }
+                    }
                 }
+                
+                // Close Action Menu
                 if (!event.target.matches('.action-btn') && !event.target.matches('.action-item')) {
-                    document.querySelectorAll(".action-menu").forEach(el => el.classList.remove('show'));
+                    var actionDropdowns = document.getElementsByClassName("action-menu");
+                    for (var i = 0; i < actionDropdowns.length; i++) {
+                        var openAction = actionDropdowns[i];
+                        if (openAction.classList.contains('show')) {
+                            openAction.classList.remove('show');
+                        }
+                    }
                 }
             };
         }
 
-        function updateClock() {
-            const now = new Date();
-            const clockEl = document.getElementById('clock');
-            if(clockEl) clockEl.textContent = now.toLocaleTimeString();
-            
-            const dateEl = document.getElementById('date-display');
-            if(dateEl) dateEl.textContent = now.toDateString();
+        function saveDB() {
+            localStorage.setItem('sf_employees', JSON.stringify(db.employees));
+            localStorage.setItem('sf_attendance', JSON.stringify(db.attendance));
+            localStorage.setItem('sf_leaves', JSON.stringify(db.leaves));
+            localStorage.setItem('sf_notifications', JSON.stringify(db.notifications));
+            localStorage.setItem('sf_ratings', JSON.stringify(db.ratings));
+            updateNotificationBadge();
         }
 
+        // --- Helper Functions ---
         function showToast(msg, type = 'success') {
             const container = document.getElementById('toast-container');
-            if(!container) return;
             const toast = document.createElement('div');
             toast.className = 'toast';
             toast.style.backgroundColor = type === 'error' ? 'var(--danger)' : 'var(--secondary)';
@@ -496,21 +434,21 @@
             setTimeout(() => toast.remove(), 3000);
         }
 
-        function updateNotificationBadge() {
-            const badge = document.getElementById('notif-badge');
-            if(badge) {
-                if (notifications.length > 0) {
-                    badge.textContent = notifications.length;
-                    badge.classList.remove('hidden');
-                } else {
-                    badge.classList.add('hidden');
-                }
-            }
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').textContent = now.toLocaleTimeString();
+            document.getElementById('date-display').textContent = now.toDateString();
         }
 
-        // --- 6. GEOLOCATION HELPER ---
+        function generateId(doj) {
+            const dateStr = doj.replace(/-/g, '').substring(2); // YYMMDD
+            const count = db.employees.filter(e => e.id.startsWith(dateStr)).length + 1;
+            const serial = count.toString().padStart(2, '0');
+            return dateStr + serial;
+        }
+
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3; 
+            const R = 6371e3; // metres
             const φ1 = lat1 * Math.PI/180;
             const φ2 = lat2 * Math.PI/180;
             const Δφ = (lat2-lat1) * Math.PI/180;
@@ -522,15 +460,22 @@
             return R * c;
         }
 
-        function sendNotification(text) {
-            addDoc(collection(db, "notifications"), {
-                text, 
-                time: new Date().toLocaleString(),
-                timestamp: serverTimestamp() 
-            });
+        function requestNotificationPermission() {
+            if ("Notification" in window && Notification.permission !== "granted") {
+                Notification.requestPermission();
+            }
         }
 
-        // --- 7. LOGIN LOGIC ---
+        function sendNotification(text) {
+            if ("Notification" in window && Notification.permission === "granted") {
+                new Notification("Smart Fresh Store", { body: text });
+            }
+            // In-App Notification
+            db.notifications.unshift({ text, time: new Date().toLocaleString() });
+            saveDB();
+        }
+
+        // --- Login Logic ---
         function setLoginRole(role) {
             loginRole = role;
             document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
@@ -539,7 +484,7 @@
             document.getElementById('login-pass').value = '';
         }
 
-        async function handleLogin(e) {
+        function handleLogin(e) {
             e.preventDefault();
             const id = document.getElementById('login-id').value.trim();
             const pass = document.getElementById('login-pass').value.trim();
@@ -552,22 +497,12 @@
                     showToast('Invalid Admin Credentials', 'error');
                 }
             } else {
-                // Find employee in Firebase
-                const q = query(collection(db, "employees"), where("email", "==", id));
-                const querySnapshot = await getDocs(q);
-                
-                let foundEmp = null;
-                querySnapshot.forEach((doc) => {
-                    const data = doc.data();
-                    // Check password (supports YYYY-MM-DD and YYYYMMDD)
-                    const cleanPass = pass.replace(/-/g, '');
-                    if (data.dob.replace(/-/g, '') === cleanPass) {
-                        foundEmp = { id: doc.id, ...data };
-                    }
-                });
+                // Supports both YYYY-MM-DD and YYYYMMDD for login compatibility
+                const cleanPass = pass.replace(/-/g, ''); 
+                const emp = db.employees.find(e => e.email === id && e.dob.replace(/-/g, '') === cleanPass);
 
-                if (foundEmp) {
-                    currentUser = foundEmp;
+                if (emp) {
+                    currentUser = emp;
                     showEmployeePortal();
                 } else {
                     showToast('Invalid Employee Credentials', 'error');
@@ -582,17 +517,31 @@
             document.getElementById('login-section').classList.remove('hidden');
         }
 
-        // --- 8. ADMIN PORTAL LOGIC ---
+        // --- Admin Portal Functions ---
         function showAdminPortal() {
             document.getElementById('login-section').classList.add('hidden');
             document.getElementById('admin-portal').classList.remove('hidden');
             switchAdminTab('home');
+            updateNotificationBadge();
+        }
+
+        function updateNotificationBadge() {
+            const badge = document.getElementById('notif-badge');
+            if (db.notifications.length > 0) {
+                badge.textContent = db.notifications.length;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
         }
 
         function showNotifications() {
             let msg = "No new notifications.";
-            if (notifications.length > 0) {
-                msg = notifications.map(n => `[${n.time}] ${n.text}`).join('\n');
+            if (db.notifications.length > 0) {
+                msg = db.notifications.map(n => `[${n.time}] ${n.text}`).join('\n');
+                // Clear after reading
+                db.notifications = [];
+                saveDB();
             }
             alert(msg);
         }
@@ -616,11 +565,9 @@
             if (tabName === 'salary') renderSalaryTab(content);
         }
 
-        // --- Render Functions ---
-
         function renderHomeTable(container) {
             let html = `<div class="table-container"><h3>Employee List</h3><table><thead><tr><th>ID</th><th>Name</th><th>Designation</th><th>Shift</th><th>Contact</th><th>Actions</th></tr></thead><tbody>`;
-            employees.forEach(emp => {
+            db.employees.forEach(emp => {
                 html += `<tr>
                     <td>${emp.id}</td>
                     <td>${emp.name}</td>
@@ -643,12 +590,10 @@
 
         function toggleActionMenu(id) {
             document.querySelectorAll('.action-menu').forEach(m => m.classList.remove('show'));
-            const menu = document.getElementById(`act-${id}`);
-            if(menu) menu.classList.add('show');
+            document.getElementById(`act-${id}`).classList.add('show');
         }
 
-        // --- CRUD OPERATIONS (FIREBASE) ---
-
+        // --- Admin: Add/Edit/Delete ---
         function openAddEmployeeModal() {
             document.getElementById('employee-form').reset();
             document.getElementById('edit-emp-id').value = '';
@@ -661,10 +606,11 @@
             document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
         }
 
-        async function saveEmployee(e) {
+        function saveEmployee(e) {
             e.preventDefault();
             const editId = document.getElementById('edit-emp-id').value;
             
+            // Internal Password Format: YYYYMMDD
             const rawDob = document.getElementById('emp-dob').value;
             const formattedDob = rawDob.replace(/-/g, '');
 
@@ -679,46 +625,27 @@
                 joining: document.getElementById('emp-joining').value,
                 salary: parseFloat(document.getElementById('emp-salary').value),
                 dutyHrs: parseFloat(document.getElementById('emp-duty').value),
+                // New Fields
                 shift: document.getElementById('emp-shift').value,
                 weeklyOff: document.getElementById('emp-offday').value
             };
 
-            try {
-                if (editId) {
-                    // Update
-                    await updateDoc(doc(db, "employees", editId), data);
-                    showToast('Employee Updated');
-                } else {
-                    // Add
-                    // Custom ID Generation
-                    const doj = data.joining;
-                    const dateStr = doj.replace(/-/g, '').substring(2);
-                    
-                    // Check existing count in Firebase for this prefix
-                    const q = query(collection(db, "employees"), where("id", ">=", dateStr));
-                    const querySnapshot = await getDocs(q);
-                    const count = querySnapshot.size; 
-                    // Note: This counts global matches. For strict date prefix count:
-                    // We filter the docs in memory (or further refine query)
-                    const matches = querySnapshot.docs.filter(d => d.id.startsWith(dateStr));
-                    const serial = (matches.length + 1).toString().padStart(2, '0');
-                    const customId = dateStr + serial;
-                    
-                    await setDoc(doc(db, "employees", customId), { id: customId, ...data });
-                    showToast('Employee Added');
-                }
-                closeModal();
-                switchAdminTab('home');
-            } catch (err) {
-                console.error(err);
-                showToast('Error saving employee', 'error');
+            if (editId) {
+                const index = db.employees.findIndex(e => e.id === editId);
+                db.employees[index] = { ...db.employees[index], ...data };
+                showToast('Employee Updated');
+            } else {
+                const id = generateId(data.joining);
+                db.employees.push({ id, ...data });
+                showToast('Employee Added');
             }
+            saveDB();
+            closeModal();
+            switchAdminTab('home');
         }
 
-        async function editEmployee(id) {
-            const emp = employees.find(e => e.id === id);
-            if(!emp) return;
-
+        function editEmployee(id) {
+            const emp = db.employees.find(e => e.id === id);
             document.getElementById('edit-emp-id').value = emp.id;
             document.getElementById('emp-name').value = emp.name;
             document.getElementById('emp-father').value = emp.father;
@@ -744,57 +671,51 @@
             document.getElementById('employee-modal').classList.add('active');
         }
 
-        async function deleteEmployee(id) {
+        function deleteEmployee(id) {
             if (confirm('Are you sure?')) {
-                try {
-                    await deleteDoc(doc(db, "employees", id));
-                    showToast('Employee Deleted');
-                } catch (err) {
-                    showToast('Error deleting', 'error');
-                }
+                db.employees = db.employees.filter(e => e.id !== id);
+                saveDB();
+                switchAdminTab('home');
+                showToast('Employee Deleted');
             }
         }
 
-        // --- RATINGS ---
+        // --- Admin: Ratings ---
         function openRatingModal(id) {
-            const emp = employees.find(e => e.id === id);
-            if(!emp) return;
+            const emp = db.employees.find(e => e.id === id);
             document.getElementById('rating-emp-id').value = id;
             document.getElementById('rating-emp-name').textContent = emp.name;
-            const r = ratings[id] || { behavior: 5, sales: 5, work: 5 };
             
-            document.getElementById('rate-behavior').value = r.behavior;
-            document.getElementById('rate-behavior').nextElementSibling.value = r.behavior;
-            document.getElementById('rate-sales').value = r.sales;
-            document.getElementById('rate-sales').nextElementSibling.value = r.sales;
-            document.getElementById('rate-work').value = r.work;
-            document.getElementById('rate-work').nextElementSibling.value = r.work;
+            const current = db.ratings[id] || { behavior: 5, sales: 5, work: 5 };
+            
+            document.getElementById('rate-behavior').value = current.behavior;
+            document.getElementById('rate-behavior').nextElementSibling.value = current.behavior;
+            document.getElementById('rate-sales').value = current.sales;
+            document.getElementById('rate-sales').nextElementSibling.value = current.sales;
+            document.getElementById('rate-work').value = current.work;
+            document.getElementById('rate-work').nextElementSibling.value = current.work;
             
             document.getElementById('rating-modal').classList.add('active');
         }
 
-        async function saveRating() {
+        function saveRating() {
             const id = document.getElementById('rating-emp-id').value;
-            const data = {
+            db.ratings[id] = {
                 behavior: parseInt(document.getElementById('rate-behavior').value),
                 sales: parseInt(document.getElementById('rate-sales').value),
                 work: parseInt(document.getElementById('rate-work').value)
             };
-            try {
-                await setDoc(doc(db, "ratings", id), data, { merge: true });
-                document.getElementById('rating-modal').classList.remove('active');
-                showToast('Rating Submitted');
-            } catch (err) {
-                showToast('Error saving rating', 'error');
-            }
+            saveDB();
+            document.getElementById('rating-modal').classList.remove('active');
+            showToast('Rating Submitted');
         }
 
-        // --- ADMIN: TABS LOGIC ---
+        // --- Admin: Tabs Logic ---
         function renderAttendanceSummary(container) {
             let html = `<div class="table-container"><h3>Attendance Summary</h3><table><thead><tr><th>ID</th><th>Name</th><th>Presents</th><th>Leaves</th></tr></thead><tbody>`;
-            employees.forEach(emp => {
-                const presents = attendance.filter(a => a.empId === emp.id && a.checkOut).length;
-                const leaves = leaves.filter(l => l.empId === emp.id && l.status === 'Approved').length;
+            db.employees.forEach(emp => {
+                const presents = db.attendance.filter(a => a.empId === emp.id && a.checkOut).length;
+                const leaves = db.leaves.filter(l => l.empId === emp.id && l.status === 'Approved').length;
                 html += `<tr><td>${emp.id}</td><td>${emp.name}</td><td>${presents}</td><td>${leaves}</td></tr>`;
             });
             html += `</tbody></table></div>`;
@@ -803,14 +724,19 @@
 
         function renderWorkSummary(container) {
             let html = `<div class="table-container"><h3>Work Summary</h3><table><thead><tr><th>ID</th><th>Name</th><th>Total Work Hrs</th><th>Total Break Hrs</th><th>Late</th><th>OT</th></tr></thead><tbody>`;
-            employees.forEach(emp => {
-                let totalWork = 0, totalBreak = 0, lateCount = 0, otTotal = 0;
-                attendance.filter(a => a.empId === emp.id && a.checkOut).forEach(rec => {
+            db.employees.forEach(emp => {
+                let totalWork = 0;
+                let totalBreak = 0;
+                let lateCount = 0;
+                let otTotal = 0;
+
+                db.attendance.filter(a => a.empId === emp.id && a.checkOut).forEach(rec => {
                     totalWork += rec.workHrs || 0;
                     totalBreak += rec.breakHrs || 0;
                     if(rec.isLate) lateCount++;
                     otTotal += rec.ot || 0;
                 });
+
                 html += `<tr>
                     <td>${emp.id}</td><td>${emp.name}</td>
                     <td>${totalWork.toFixed(2)} hrs</td>
@@ -825,21 +751,33 @@
 
         function renderSalaryTab(container) {
             let html = `<div class="table-container"><h3>Salary Details</h3><table><thead><tr><th>ID</th><th>Name</th><th>Hrs</th><th>OT</th><th>Late</th><th>Calc Salary (₹)</th><th>Status</th></tr></thead><tbody>`;
-            employees.forEach(emp => {
-                let totalWork = 0, totalOT = 0, lateCount = 0;
-                attendance.filter(a => a.empId === emp.id && a.checkOut).forEach(rec => {
+            
+            db.employees.forEach(emp => {
+                let totalWork = 0;
+                let totalOT = 0;
+                let lateCount = 0;
+
+                db.attendance.filter(a => a.empId === emp.id && a.checkOut).forEach(rec => {
                     totalWork += rec.workHrs || 0;
                     totalOT += rec.ot || 0;
                     if(rec.isLate) lateCount++;
                 });
-                const daysInMonth = 26; // Paid weekly off adjustment
+
+                // Salary Calculation with Shift/Off Day Logic
+                // Using 26 working days to account for paid weekly off
+                const daysInMonth = 26; 
                 const hourlyRate = emp.salary / (daysInMonth * emp.dutyHrs);
                 const standardWorkHrs = totalWork - totalOT;
+                
                 const standardPay = standardWorkHrs * hourlyRate;
                 const otPay = totalOT * (hourlyRate * 1.5);
+                
+                // NEW: Fixed ₹50 deduction per late day
                 const lateDeduction = lateCount * 50;
+
                 const finalSalary = standardPay + otPay - lateDeduction;
                 const displaySalary = finalSalary > 0 ? finalSalary.toFixed(2) : "0.00";
+
                 html += `<tr>
                     <td>${emp.id}</td><td>${emp.name}</td>
                     <td>${totalWork.toFixed(2)}</td>
@@ -853,12 +791,13 @@
             container.innerHTML = html;
         }
 
-        // --- EMPLOYEE PORTAL LOGIC ---
+        // --- Employee Portal Functions ---
         function showEmployeePortal() {
             document.getElementById('login-section').classList.add('hidden');
             document.getElementById('employee-portal').classList.remove('hidden');
             document.getElementById('emp-welcome-msg').textContent = `Welcome, ${currentUser.name}`;
             
+            // Display Shift and Off Day
             document.getElementById('emp-shift-display').textContent = currentUser.shift === 'morning' ? 'Morning (8 AM)' : 'Evening (12 PM)';
             document.getElementById('emp-offday-display').textContent = currentUser.weeklyOff;
             
@@ -872,9 +811,13 @@
                 document.getElementById('location-status').innerHTML = '<span class="status-fail status-badge">Geolocation not supported</span>';
                 return;
             }
+            
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    const dist = calculateDistance(position.coords.latitude, position.coords.longitude, TARGET_LATITUDE, TARGET_LONGITUDE);
+                    const dist = calculateDistance(
+                        position.coords.latitude, position.coords.longitude,
+                        TARGET_LATITUDE, TARGET_LONGITUDE
+                    );
                     const el = document.getElementById('location-status');
                     if (dist <= ALLOWED_RADIUS) {
                         locationAllowed = true;
@@ -893,10 +836,10 @@
 
         function setButtonStates() {
             const todayStr = new Date().toISOString().slice(0,10);
-            const rec = attendance.find(a => a.empId === currentUser.id && a.date === todayStr);
-            const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+            const rec = db.attendance.find(a => a.empId === currentUser.id && a.date === todayStr);
 
-            // Weekly Off Check
+            // Check if today is Weekly Off
+            const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
             if (todayDayName === currentUser.weeklyOff) {
                 // It's weekly off, disable everything and show message
                 document.getElementById('btn-check-in').disabled = true;
@@ -939,7 +882,7 @@
             }
         }
 
-        async function handleAttendance(type) {
+        function handleAttendance(type) {
             if (!locationAllowed) {
                 showToast('You must be within 100m of the store!', 'error');
                 checkLocationStatus();
@@ -947,7 +890,7 @@
             }
 
             const todayStr = new Date().toISOString().slice(0,10);
-            let rec = attendance.find(a => a.empId === currentUser.id && a.date === todayStr);
+            let rec = db.attendance.find(a => a.empId === currentUser.id && a.date === todayStr);
             const now = new Date();
 
             if (type === 'checkIn') {
@@ -980,54 +923,47 @@
                 }
                 rec.isLate = isLate;
                 
-                await addDoc(collection(db, "attendance"), rec);
+                db.attendance.push(rec);
                 sendNotification(`${currentUser.name} Checked In.`);
                 showToast('Checked In Successfully');
             } else {
-                if (rec) {
-                    if (type === 'breakOut') rec.breakOut = now.toISOString();
-                    if (type === 'breakIn') rec.breakIn = now.toISOString();
-                    if (type === 'lunchOut') rec.lunchOut = now.toISOString();
-                    if (type === 'lunchIn') rec.lunchIn = now.toISOString();
+                if (type === 'breakOut') rec.breakOut = now.toISOString();
+                if (type === 'breakIn') rec.breakIn = now.toISOString();
+                if (type === 'lunchOut') rec.lunchOut = now.toISOString();
+                if (type === 'lunchIn') rec.lunchIn = now.toISOString();
+                
+                if (type === 'checkOut') {
+                    rec.checkOut = now.toISOString();
                     
-                    if (type === 'checkOut') {
-                        rec.checkOut = now.toISOString();
-                        
-                        const start = new Date(rec.checkIn);
-                        const end = new Date(rec.checkOut);
-                        let totalMs = end - start;
-                        
-                        let breakMs = 0;
-                        if(rec.breakOut && rec.breakIn) breakMs += (new Date(rec.breakIn) - new Date(rec.breakOut));
-                        if(rec.lunchOut && rec.lunchIn) breakMs += (new Date(rec.lunchIn) - new Date(rec.lunchOut));
-                        
-                        rec.workHrs = (totalMs - breakMs) / (1000 * 60 * 60);
-                        rec.breakHrs = breakMs / (1000 * 60 * 60);
-                        
-                        const dutyHrs = currentUser.dutyHrs || 8;
-                        if (rec.workHrs > dutyHrs) {
-                            rec.ot = rec.workHrs - dutyHrs;
-                        }
-                        
-                        // Update the specific doc in DB
-                        const q = query(collection(db, "attendance"), where("empId", "==", currentUser.id), where("date", "==", todayStr));
-                        const snap = await getDocs(q);
-                        if(!snap.empty) {
-                            const docId = snap.docs[0].id;
-                            await updateDoc(doc(db, "attendance", docId), rec);
-                            sendNotification(`${currentUser.name} Checked Out. Work: ${rec.workHrs.toFixed(2)}h`);
-                        }
+                    const start = new Date(rec.checkIn);
+                    const end = new Date(rec.checkOut);
+                    let totalMs = end - start;
+                    
+                    let breakMs = 0;
+                    if(rec.breakOut && rec.breakIn) breakMs += (new Date(rec.breakIn) - new Date(rec.breakOut));
+                    if(rec.lunchOut && rec.lunchIn) breakMs += (new Date(rec.lunchIn) - new Date(rec.lunchOut));
+                    
+                    rec.workHrs = (totalMs - breakMs) / (1000 * 60 * 60);
+                    rec.breakHrs = breakMs / (1000 * 60 * 60);
+                    
+                    const dutyHrs = currentUser.dutyHrs || 8;
+                    if (rec.workHrs > dutyHrs) {
+                        rec.ot = rec.workHrs - dutyHrs;
                     }
+                    sendNotification(`${currentUser.name} Checked Out. Work: ${rec.workHrs.toFixed(2)}h`);
                 }
             }
+            
+            saveDB();
+            setButtonStates();
         }
 
-        async function submitLeave() {
+        function submitLeave() {
             const date = document.getElementById('leave-date').value;
             const reason = document.getElementById('leave-reason').value;
             if (!date || !reason) return showToast('Please fill all fields', 'error');
 
-            await addDoc(collection(db, "leaves"), {
+            db.leaves.push({
                 empId: currentUser.id,
                 date: date,
                 reason: reason,
@@ -1039,7 +975,7 @@
             document.getElementById('leave-reason').value = '';
         }
 
-        async function submitSuggestion() {
+        function submitSuggestion() {
             const txt = document.getElementById('suggestion-text').value;
             if (!txt) return showToast('Write something first', 'error');
             sendNotification(`Suggestion from ${currentUser.name}: ${txt}`);
@@ -1049,23 +985,36 @@
 
         function renderMyRatings() {
             const container = document.getElementById('my-ratings-display');
-            const r = ratings[currentUser.id];
+            const r = db.ratings[currentUser.id];
             if (!r) {
                 container.innerHTML = '<p>No ratings available yet.</p>';
                 return;
             }
+            
             container.innerHTML = `
-                <div class="rating-display"><span>Behavior</span><span>${r.behavior}/10</span></div>
+                <div class="rating-display">
+                    <span>Behavior</span>
+                    <span>${r.behavior}/10</span>
+                </div>
                 <div class="rating-bar"><div class="rating-fill" style="width:${r.behavior*10}%"></div></div>
-                <div class="rating-display" style="margin-top:15px"><span>Sales</span><span>${r.sales}/10</span></div>
+                
+                <div class="rating-display" style="margin-top:15px">
+                    <span>Sales</span>
+                    <span>${r.sales}/10</span>
+                </div>
                 <div class="rating-bar"><div class="rating-fill" style="width:${r.sales*10}%"></div></div>
-                <div class="rating-display" style="margin-top:15px"><span>Work</span><span>${r.work}/10</span></div>
+                
+                <div class="rating-display" style="margin-top:15px">
+                    <span>Work</span>
+                    <span>${r.work}/10</span>
+                </div>
                 <div class="rating-bar"><div class="rating-fill" style="width:${r.work*10}%"></div></div>
             `;
         }
 
         // --- Run ---
         init();
+
     </script>
 </body>
 </html>
