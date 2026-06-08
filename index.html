@@ -30,13 +30,14 @@
 
         /* --- Utilities --- */
         .hidden { display: none !important; }
-        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; font-size: 0.95rem; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; font-size: 0.95rem; justify-content: center; }
         .btn:active { transform: scale(0.98); }
         .btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
         .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
         .btn-danger { background: var(--danger); color: white; }
         .btn-outline { border: 1px solid var(--border); background: white; color: var(--text-main); }
         .btn-outline:hover { background: #f8fafc; border-color: var(--primary); color: var(--primary); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; filter: grayscale(100%); }
         
         .flex { display: flex; align-items: center; }
         .flex-between { justify-content: space-between; }
@@ -101,11 +102,11 @@
         .table-wrapper { overflow-x: auto; background: white; border-radius: var(--radius); border: 1px solid var(--border); }
         table { width: 100%; border-collapse: collapse; }
         th { background: #f8fafc; padding: 16px; text-align: left; font-weight: 600; color: var(--text-light); font-size: 0.85rem; border-bottom: 1px solid var(--border); }
-        td { padding: 16px; border-bottom: 1px solid var(--border); color: var(--text-main); font-size: 0.95rem; position: relative; } /* Added position relative for dropdown */
+        td { padding: 16px; border-bottom: 1px solid var(--border); color: var(--text-main); font-size: 0.95rem; position: relative; }
         tr:last-child td { border-bottom: none; }
         tr:hover td { background: #fcfcfc; }
 
-        /* --- Action Dropdown Styles (New) --- */
+        /* --- Action Dropdown Styles --- */
         .action-btn { background: none; border: none; font-size: 1.2rem; color: var(--text-light); cursor: pointer; padding: 5px; border-radius: 4px; }
         .action-btn:hover { background: #f1f5f9; color: var(--primary); }
         
@@ -133,7 +134,6 @@
         /* --- Employee Portal --- */
         .employee-layout { max-width: 1000px; margin: 0 auto; width: 100%; padding: 24px; }
         
-        /* Employee Time Header (New) */
         .emp-time-header {
             background: white;
             padding: 20px;
@@ -155,8 +155,6 @@
         .stat-value { font-size: 1.2rem; font-weight: 700; color: var(--warning); }
 
         .attendance-panel { background: white; padding: 32px; border-radius: 20px; box-shadow: var(--shadow-sm); text-align: center; margin-bottom: 32px; border: 1px solid var(--border); }
-        .time-display { font-size: 3.5rem; font-weight: 800; color: var(--secondary); margin: 16px 0; font-variant-numeric: tabular-nums; letter-spacing: -2px; }
-        .date-display { color: var(--text-light); font-size: 1.1rem; margin-bottom: 24px; }
         
         .action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 32px; }
         .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; margin-bottom: 16px; }
@@ -176,6 +174,14 @@
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         .full-width { grid-column: span 2; }
         .modal-footer { margin-top: 32px; display: flex; justify-content: flex-end; gap: 12px; }
+
+        /* Notification List Styles */
+        .notif-list { display: flex; flex-direction: column; gap: 12px; max-height: 60vh; overflow-y: auto; }
+        .notif-item { background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
+        .notif-header { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 4px; color: var(--secondary); }
+        .notif-type { font-size: 0.8rem; text-transform: uppercase; color: var(--primary); }
+        .notif-body { font-size: 0.9rem; color: var(--text-main); line-height: 1.4; }
+        .empty-notif { text-align: center; color: var(--text-light); padding: 20px; }
 
         /* Rating Bars */
         .rating-row { margin-bottom: 16px; }
@@ -250,7 +256,6 @@
                 <div class="nav-label">Main Menu</div>
                 <div class="nav-item active" onclick="switchAdminTab('home', this)">👥 Employees</div>
                 <div class="nav-item" onclick="switchAdminTab('attendance', this)">📅 Attendance</div>
-                <!-- Holiday Tab Removed as requested -->
                 <div class="nav-item" onclick="switchAdminTab('work', this)">⏱️ Work Summary</div>
                 <div class="nav-item" onclick="switchAdminTab('salary', this)">💰 Salary</div>
             </aside>
@@ -270,7 +275,6 @@
         </header>
         <div class="dashboard-container employee-layout">
             
-            <!-- NEW: Live Time & Date Header at Top -->
             <div class="emp-time-header">
                 <div class="time-display" id="top-clock">00:00:00</div>
                 <div class="date-display" id="top-date-display">Loading Date...</div>
@@ -413,7 +417,7 @@
         </div>
     </div>
 
-    <!-- Add Holiday Modal (Hidden functionality kept for logic, but UI not used in sidebar) -->
+    <!-- Add Holiday Modal -->
     <div id="holiday-modal" class="modal-overlay">
         <div class="modal">
             <h2>Add Holiday</h2>
@@ -468,6 +472,19 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline" onclick="document.getElementById('rating-modal').classList.remove('active')">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveRating()">Submit Rating</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications View Modal (New) -->
+    <div id="notification-view-modal" class="modal-overlay">
+        <div class="modal">
+            <h2>Notifications</h2>
+            <div id="notification-list-container" class="notif-list">
+                <!-- Notifications injected here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="closeNotificationModal()">Close</button>
             </div>
         </div>
     </div>
@@ -534,19 +551,21 @@
             }, 3000);
         }
 
+        // Helper to format timestamps into readable time (e.g., 09:15 AM)
+        function formatTime(ts) {
+            if (!ts) return '--:--';
+            const date = ts.toDate ? ts.toDate() : new Date(ts);
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
         function updateClock() {
             const now = new Date();
             const timeStr = now.toLocaleTimeString();
             const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             
-            // Update both old and new clock elements
-            const clockEl = document.getElementById('clock');
-            const dateEl = document.getElementById('date-display');
             const topClockEl = document.getElementById('top-clock');
             const topDateEl = document.getElementById('top-date-display');
 
-            if(clockEl) clockEl.textContent = timeStr;
-            if(dateEl) dateEl.textContent = dateStr;
             if(topClockEl) topClockEl.textContent = timeStr;
             if(topDateEl) topDateEl.textContent = dateStr;
         }
@@ -566,10 +585,17 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        async function sendNotification(text) {
+        async function sendNotification(text, type = 'info', details = '') {
             if ("Notification" in window && Notification.permission === "granted") new Notification("SmartFresh", { body: text });
             if (db) {
-                await addDoc(collection(db, "notifications"), { text, timestamp: serverTimestamp(), read: false });
+                // Store full details so admin can read them
+                await addDoc(collection(db, "notifications"), { 
+                    text, 
+                    type, // 'leave', 'feedback', 'attendance'
+                    details, // The long text (reason, message, etc)
+                    timestamp: serverTimestamp(), 
+                    read: false 
+                });
                 const badge = document.getElementById('notif-badge');
                 badge.textContent = parseInt(badge.textContent || '0') + 1;
                 badge.classList.remove('hidden');
@@ -626,12 +652,10 @@
 
         // --- Global Click Handler for Dropdowns ---
         window.onclick = function(event) {
-            // Close Admin Menu
             if (!event.target.closest('.icon-btn') && !event.target.closest('#admin-menu')) {
                 const menu = document.getElementById('admin-menu');
                 if(menu) menu.classList.add('hidden');
             }
-            // Close Action Dropdowns
             if (!event.target.closest('.action-btn') && !event.target.closest('.action-dropdown')) {
                 document.querySelectorAll('.action-dropdown').forEach(d => d.classList.remove('show'));
             }
@@ -651,14 +675,48 @@
             snap.forEach(d => localEmployeesCache.push({ id: d.id, ...d.data() }));
         }
 
+        // --- Fixed Notification Logic ---
         window.showNotifications = async function() {
+            const container = document.getElementById('notification-list-container');
+            container.innerHTML = '<p style="text-align:center;">Loading...</p>';
+            document.getElementById('notification-view-modal').classList.add('active');
+            
             const snap = await getDocs(query(collection(db, "notifications"), orderBy("timestamp", "desc")));
-            let msg = "No new notifications.";
-            if(!snap.empty) {
-                msg = snap.docs.map(d => `[${d.data().timestamp?.toDate().toLocaleTimeString()}] ${d.data().text}`).join('\n');
-                document.getElementById('notif-badge').classList.add('hidden');
+            
+            if(snap.empty) {
+                container.innerHTML = '<div class="empty-notif">No new notifications.</div>';
+            } else {
+                container.innerHTML = '';
+                let hasNew = false;
+                snap.forEach(d => {
+                    const data = d.data();
+                    const dateStr = data.timestamp ? data.timestamp.toDate().toLocaleString() : 'Just now';
+                    
+                    // HTML to show the notification clearly
+                    const item = document.createElement('div');
+                    item.className = 'notif-item';
+                    item.innerHTML = `
+                        <div class="notif-header">
+                            <span class="notif-type">${data.type}</span>
+                            <span style="font-size:0.8rem; color:#888;">${dateStr}</span>
+                        </div>
+                        <div class="notif-body">
+                            <strong>${data.text}</strong><br/>
+                            ${data.details ? `<span style="color:#555; margin-top:4px; display:block;">"${data.details}"</span>` : ''}
+                        </div>
+                    `;
+                    container.appendChild(item);
+                    
+                    // Mark as read logic could go here
+                    if(!data.read) hasNew = true; 
+                });
+                
+                if(!hasNew) document.getElementById('notif-badge').classList.add('hidden');
             }
-            alert(msg);
+        }
+        
+        window.closeNotificationModal = function() {
+            document.getElementById('notification-view-modal').classList.remove('active');
         }
 
         window.toggleMenu = function(id) {
@@ -676,7 +734,6 @@
 
             if(tab === 'home') renderEmployeeTable(content);
             if(tab === 'attendance') renderAttendanceSummary(content);
-            // Holiday tab removed
             if(tab === 'work') renderWorkSummary(content);
             if(tab === 'salary') renderSalaryTab(content);
         }
@@ -705,7 +762,7 @@
                         <td>${emp.designation}</td>
                         <td><span style="padding:4px 8px; background:#ecfdf5; color:#059669; border-radius:4px; font-size:0.8rem;">${emp.shift}</span></td>
                         <td>${emp.contact}</td>
-                        <td style="padding:0;"> <!-- Action Cell -->
+                        <td style="padding:0;">
                             <div style="position:relative; padding:16px;">
                                 <button class="action-btn" onclick="toggleActionMenu('${emp.id}')">⋮</button>
                                 <div id="act-${emp.id}" class="action-dropdown">
@@ -723,11 +780,9 @@
         }
 
         window.toggleActionMenu = function(id) {
-            // Close all other menus first
             document.querySelectorAll('.action-dropdown').forEach(d => {
                 if(d.id !== `act-${id}`) d.classList.remove('show');
             });
-            // Toggle current
             const menu = document.getElementById(`act-${id}`);
             if(menu.classList.contains('show')) {
                 menu.classList.remove('show');
@@ -810,7 +865,6 @@
             }
         }
 
-        // --- Admin: Ratings ---
         window.openRatingModal = function(id) {
             document.getElementById('rating-emp-id').value = id;
             const emp = localEmployeesCache.find(e => e.id === id);
@@ -830,7 +884,7 @@
             showToast('Rating Submitted');
         }
 
-        // --- Summary Views ---
+        // --- Summary Views (Fixed Glitch) ---
         async function renderAttendanceSummary(container) {
             const empSnap = await getDocs(collection(db, "employees"));
             const attSnap = await getDocs(collection(db, "attendance"));
@@ -842,9 +896,11 @@
 
             let html = `<div class="page-header"><div class="page-title">Attendance Summary</div></div><div class="table-wrapper"><table><thead><tr><th>ID</th><th>Name</th><th>Presents</th><th>Leaves</th></tr></thead><tbody>`;
             employees.forEach(emp => {
+                // Safety check: only count if attendance exists and has checkOut
                 const presents = attendance.filter(a => a.empId === emp.id && a.checkOut).length;
-                const leaves = leaves.filter(l => l.empId === emp.id && l.status === 'Approved').length;
-                html += `<tr><td>${emp.id}</td><td>${emp.name}</td><td>${presents}</td><td>${leaves}</td></tr>`;
+                // Safety check: leaves status must be Approved
+                const leavesCount = leaves.filter(l => l.empId === emp.id && l.status === 'Approved').length;
+                html += `<tr><td>${emp.id}</td><td>${emp.name}</td><td>${presents}</td><td>${leavesCount}</td></tr>`;
             });
             html += `</tbody></table></div>`;
             container.innerHTML = html;
@@ -865,7 +921,9 @@
             let html = `<div class="page-header"><div class="page-title">Work Summary</div></div><div class="table-wrapper"><table><thead><tr><th>ID</th><th>Name</th><th>Work</th><th>Break</th><th>Late</th><th>OT</th></tr></thead><tbody>`;
             for (const [id, s] of Object.entries(summary)) {
                 const emp = localEmployeesCache.find(e => e.id === id);
-                html += `<tr><td>${id}</td><td>${emp?.name||'Unknown'}</td><td>${s.work.toFixed(1)}h</td><td>${s.break.toFixed(1)}h</td><td style="color:${s.late?'red':'inherit'}">${s.late}</td><td>${s.ot.toFixed(1)}h</td></tr>`;
+                // Safety check for emp name
+                const empName = emp ? emp.name : 'Unknown'; 
+                html += `<tr><td>${id}</td><td>${empName}</td><td>${s.work.toFixed(1)}h</td><td>${s.break.toFixed(1)}h</td><td style="color:${s.late?'red':'inherit'}">${s.late}</td><td>${s.ot.toFixed(1)}h</td></tr>`;
             }
             html += `</tbody></table></div>`;
             container.innerHTML = html;
@@ -886,7 +944,9 @@
             localEmployeesCache.forEach(emp => {
                 const s = summary[emp.id] || { work:0, ot:0, late:0 };
                 const daysInMonth = 26; 
-                const hourlyRate = emp.salary / (daysInMonth * emp.dutyHrs);
+                // Safety check for dutyHrs
+                const duty = emp.dutyHrs || 8; 
+                const hourlyRate = emp.salary / (daysInMonth * duty);
                 const standardPay = (s.work - s.ot) * hourlyRate;
                 const otPay = s.ot * (hourlyRate * 1.5);
                 const lateDeduction = s.late * 50;
@@ -907,10 +967,8 @@
             document.getElementById('emp-shift-display').textContent = currentUser.shift === 'morning' ? 'Morning (8 AM)' : 'Evening (12 PM)';
             document.getElementById('emp-offday-display').textContent = currentUser.weeklyOff;
             
-            checkLocationStatus();
-            checkHolidayStatus();
-            renderMyRatings();
-            setButtonStates();
+            // Issue 2: Check location immediately on login
+            checkHolidayStatus(); // This will eventually call checkLocationStatus
         }
 
         async function checkHolidayStatus() {
@@ -933,6 +991,7 @@
             if(isHoliday) return;
             if (!navigator.geolocation) {
                 document.getElementById('location-status').innerHTML = '<span class="status-fail status-badge">❌ Geo not supported</span>';
+                locationAllowed = false;
                 return;
             }
             navigator.geolocation.getCurrentPosition(
@@ -948,10 +1007,12 @@
                 () => {
                     locationAllowed = false;
                     document.getElementById('location-status').innerHTML = '<div class="status-badge status-fail">❌ Location Denied</div>';
+                    setButtonStates();
                 }
             );
         }
 
+        // Issue 3: Button Logic with Timestamps
         async function setButtonStates() {
             const todayStr = new Date().toISOString().slice(0,10);
             const q = query(collection(db, "attendance"), where("empId", "==", currentUser.id), where("date", "==", todayStr));
@@ -959,19 +1020,6 @@
             let rec = snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };
 
             const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-            if (todayDayName === currentUser.weeklyOff || isHoliday) {
-                const msg = isHoliday ? "Holiday" : "Weekly Off";
-                const btnIn = document.getElementById('btn-check-in');
-                btnIn.disabled = true;
-                btnIn.textContent = msg;
-                btnIn.className = 'btn btn-outline';
-                ['btn-breakfast-out', 'btn-breakfast-in', 'btn-lunch-out', 'btn-lunch-in', 'btn-check-out'].forEach(id => document.getElementById(id).disabled = true);
-                return;
-            } else {
-                document.getElementById('btn-check-in').textContent = "🟢 Check In";
-                document.getElementById('btn-check-in').className = 'btn btn-primary';
-            }
-
             const btns = {
                 in: document.getElementById('btn-check-in'),
                 bOut: document.getElementById('btn-breakfast-out'),
@@ -981,19 +1029,84 @@
                 out: document.getElementById('btn-check-out')
             };
 
-            Object.values(btns).forEach(b => b.disabled = true);
-            if (!rec && locationAllowed) btns.in.disabled = false;
-            else if (rec) {
-                if (!rec.breakOut) btns.bOut.disabled = false;
-                else if (!rec.breakIn) btns.bIn.disabled = false;
-                else if (!rec.lunchOut) btns.lOut.disabled = false;
-                else if (!rec.lunchIn) btns.lIn.disabled = false;
-                else if (!rec.checkOut) btns.out.disabled = false;
+            // Reset all buttons to default state first
+            Object.values(btns).forEach(b => {
+                b.disabled = true;
+                b.classList.remove('btn-primary', 'btn-danger');
+                b.classList.add('btn-outline');
+                b.innerHTML = b.getAttribute('data-original-text') || b.innerText; // Reset text if needed, but logic below overrides
+            });
+
+            // Handle Weekly Off / Holiday
+            if (todayDayName === currentUser.weeklyOff || isHoliday) {
+                const msg = isHoliday ? "Holiday" : "Weekly Off";
+                btns.in.textContent = msg;
+                btns.in.disabled = true;
+                return;
+            }
+
+            // Helper to set button to time
+            const setBtnTime = (btn, time) => {
+                if (time) {
+                    btn.textContent = formatTime(time);
+                    btn.disabled = true;
+                    btn.classList.add('btn-outline'); 
+                }
+            };
+
+            // Restore Default Labels for active buttons
+            btns.in.textContent = "🟢 Check In";
+            btns.in.className = 'btn btn-primary';
+
+            btns.bOut.textContent = "🍳 Break Out";
+            btns.bIn.textContent = "☕ Break In";
+            btns.lOut.textContent = "🥗 Lunch Out";
+            btns.lIn.textContent = "🍽️ Lunch In";
+            btns.out.textContent = "🔴 Check Out";
+            btns.out.className = 'btn btn-danger';
+
+            if (!rec && locationAllowed) {
+                btns.in.disabled = false;
+            } else if (rec) {
+                // Check In clicked
+                setBtnTime(btns.in, rec.checkIn);
+                
+                // Break Logic
+                if (!rec.breakOut && locationAllowed) btns.bOut.disabled = false;
+                else {
+                    setBtnTime(btns.bOut, rec.breakOut);
+                    if (!rec.breakIn && locationAllowed) btns.bIn.disabled = false;
+                    else {
+                        setBtnTime(btns.bIn, rec.breakIn);
+                    }
+                }
+
+                // Lunch Logic
+                if (!rec.lunchOut && locationAllowed) btns.lOut.disabled = false;
+                else {
+                    setBtnTime(btns.lOut, rec.lunchOut);
+                    if (!rec.lunchIn && locationAllowed) btns.lIn.disabled = false;
+                    else {
+                        setBtnTime(btns.lIn, rec.lunchIn);
+                    }
+                }
+
+                // Check Out Logic
+                if (!rec.checkOut && locationAllowed) btns.out.disabled = false;
+                else {
+                    setBtnTime(btns.out, rec.checkOut);
+                }
             }
         }
 
         window.handleAttendance = async function(type) {
-            if (!locationAllowed) return showToast('Must be at store!', 'error');
+            // Issue 2: Enforce Location Check every time before action
+            if(!locationAllowed) {
+                // Re-check location just in case status is stale
+                checkLocationStatus();
+                if(!locationAllowed) return showToast('Must be at store to perform this action!', 'error');
+            }
+
             const todayStr = new Date().toISOString().slice(0,10);
             const q = query(collection(db, "attendance"), where("empId", "==", currentUser.id), where("date", "==", todayStr));
             const snap = await getDocs(q);
@@ -1012,16 +1125,30 @@
                     breakOut: null, breakIn: null, lunchOut: null, lunchIn: null, checkOut: null,
                     workHrs: 0, breakHrs: 0, ot: 0, isLate
                 });
-                sendNotification(`${currentUser.name} Checked In.`);
+                sendNotification(`${currentUser.name} Checked In.`, 'attendance');
                 showToast('Checked In');
             } else {
                 if(snap.empty) return;
                 const docId = snap.docs[0].id;
                 const updateData = {};
+                
+                // Issue 3: Disable button immediately and show time (Optimistic UI)
+                const btnId = type === 'breakOut' ? 'btn-breakfast-out' :
+                              type === 'breakIn' ? 'btn-breakfast-in' :
+                              type === 'lunchOut' ? 'btn-lunch-out' :
+                              type === 'lunchIn' ? 'btn-lunch-in' : 'btn-check-out';
+                
+                const btn = document.getElementById(btnId);
+                if(btn) {
+                    btn.textContent = formatTime(now);
+                    btn.disabled = true;
+                }
+
                 if (type === 'breakOut') updateData.breakOut = serverTimestamp();
                 if (type === 'breakIn') updateData.breakIn = serverTimestamp();
                 if (type === 'lunchOut') updateData.lunchOut = serverTimestamp();
                 if (type === 'lunchIn') updateData.lunchIn = serverTimestamp();
+                
                 if (type === 'checkOut') {
                     updateData.checkOut = serverTimestamp();
                     const r = snap.docs[0].data();
@@ -1033,7 +1160,7 @@
                     updateData.workHrs = (totalMs - breakMs) / 3600000;
                     updateData.breakHrs = breakMs / 3600000;
                     if(updateData.workHrs > currentUser.dutyHrs) updateData.ot = updateData.workHrs - currentUser.dutyHrs;
-                    sendNotification(`${currentUser.name} Checked Out (${updateData.workHrs.toFixed(1)}h)`);
+                    sendNotification(`${currentUser.name} Checked Out (${updateData.workHrs.toFixed(1)}h)`, 'attendance');
                 }
                 await updateDoc(doc(db, "attendance", docId), updateData);
             }
@@ -1044,8 +1171,13 @@
             const date = document.getElementById('leave-date').value;
             const reason = document.getElementById('leave-reason').value;
             if(!date || !reason) return showToast('Fill all fields', 'error');
+            
+            // Issue 1: Save to DB
             await addDoc(collection(db, "leaves"), { empId: currentUser.id, date, reason, status: 'Pending' });
-            sendNotification(`Leave Request: ${currentUser.name}`);
+            
+            // Issue 1: Send Notification with Reason Details
+            sendNotification(`Leave Request: ${currentUser.name}`, 'leave', `Date: ${date}. Reason: ${reason}`);
+            
             showToast('Request Sent');
             document.getElementById('leave-reason').value = '';
         }
@@ -1053,7 +1185,10 @@
         window.submitSuggestion = function() {
             const txt = document.getElementById('suggestion-text').value;
             if(!txt) return showToast('Write something', 'error');
-            sendNotification(`Feedback: ${currentUser.name}`);
+            
+            // Issue 1: Send Notification with Feedback Details
+            sendNotification(`Feedback from ${currentUser.name}`, 'feedback', txt);
+            
             showToast('Sent');
             document.getElementById('suggestion-text').value = '';
         }
