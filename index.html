@@ -118,7 +118,7 @@
             border: 1px solid var(--border); 
             box-shadow: var(--shadow-lg); 
             border-radius: 8px; 
-            width: 120px; 
+            width: 140px; 
             z-index: 50; 
             display: none; 
             flex-direction: column; 
@@ -258,6 +258,7 @@
                 <div class="nav-item" onclick="switchAdminTab('attendance', this)">📅 Attendance</div>
                 <div class="nav-item" onclick="switchAdminTab('work', this)">⏱️ Work Summary</div>
                 <div class="nav-item" onclick="switchAdminTab('salary', this)">💰 Salary</div>
+                <div class="nav-item" onclick="switchAdminTab('holidays', this)">🎉 Holidays</div>
             </aside>
             <main class="main-content" id="admin-content-area">
                 <!-- Content injected via JS -->
@@ -438,6 +439,32 @@
         </div>
     </div>
 
+    <!-- Add Day Off Modal -->
+    <div id="dayoff-modal" class="modal-overlay">
+        <div class="modal">
+            <h2>Allot Day Off</h2>
+            <input type="hidden" id="dayoff-emp-id">
+            <div class="form-group">
+                <label>Employee</label>
+                <input type="text" id="dayoff-emp-name" class="form-control" disabled style="background:#f1f5f9;">
+            </div>
+            <form onsubmit="saveDayOff(event)">
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" id="dayoff-date" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Reason (Optional)</label>
+                    <textarea id="dayoff-reason" class="form-control" rows="2"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Rate Employee Modal -->
     <div id="rating-modal" class="modal-overlay">
         <div class="modal">
@@ -521,6 +548,7 @@
         let locationAllowed = false;
         let localEmployeesCache = [];
         let isHoliday = false;
+        let isSpecialDayOff = false; // New flag
 
         // --- Init ---
         async function init() {
@@ -551,7 +579,6 @@
             }, 3000);
         }
 
-        // Helper to format timestamps into readable time (e.g., 09:15 AM)
         function formatTime(ts) {
             if (!ts) return '--:--';
             const date = ts.toDate ? ts.toDate() : new Date(ts);
@@ -588,11 +615,10 @@
         async function sendNotification(text, type = 'info', details = '') {
             if ("Notification" in window && Notification.permission === "granted") new Notification("SmartFresh", { body: text });
             if (db) {
-                // Store full details so admin can read them
                 await addDoc(collection(db, "notifications"), { 
                     text, 
-                    type, // 'leave', 'feedback', 'attendance'
-                    details, // The long text (reason, message, etc)
+                    type, 
+                    details, 
                     timestamp: serverTimestamp(), 
                     read: false 
                 });
@@ -650,7 +676,6 @@
             document.getElementById('login-section').classList.remove('hidden');
         }
 
-        // --- Global Click Handler for Dropdowns ---
         window.onclick = function(event) {
             if (!event.target.closest('.icon-btn') && !event.target.closest('#admin-menu')) {
                 const menu = document.getElementById('admin-menu');
@@ -675,7 +700,6 @@
             snap.forEach(d => localEmployeesCache.push({ id: d.id, ...d.data() }));
         }
 
-        // --- Fixed Notification Logic ---
         window.showNotifications = async function() {
             const container = document.getElementById('notification-list-container');
             container.innerHTML = '<p style="text-align:center;">Loading...</p>';
@@ -687,31 +711,28 @@
                 container.innerHTML = '<div class="empty-notif">No new notifications.</div>';
             } else {
                 container.innerHTML = '';
-                let hasNew = false;
                 snap.forEach(d => {
                     const data = d.data();
                     const dateStr = data.timestamp ? data.timestamp.toDate().toLocaleString() : 'Just now';
-                    
-                    // HTML to show the notification clearly
                     const item = document.createElement('div');
                     item.className = 'notif-item';
+                    let detailsHtml = '';
+                    if (data.details) {
+                        detailsHtml = `<div style="background:#f1f5f9; padding:8px; border-radius:6px; margin-top:6px; font-size:0.85rem; color:#334155; border-left:3px solid var(--primary);">${data.details}</div>`;
+                    }
                     item.innerHTML = `
                         <div class="notif-header">
-                            <span class="notif-type">${data.type}</span>
+                            <span class="notif-type" style="color:${data.type === 'leave' ? 'var(--danger)' : data.type === 'feedback' ? 'var(--accent)' : 'var(--primary)'}">${data.type}</span>
                             <span style="font-size:0.8rem; color:#888;">${dateStr}</span>
                         </div>
                         <div class="notif-body">
-                            <strong>${data.text}</strong><br/>
-                            ${data.details ? `<span style="color:#555; margin-top:4px; display:block;">"${data.details}"</span>` : ''}
+                            <strong>${data.text}</strong>
+                            ${detailsHtml}
                         </div>
                     `;
                     container.appendChild(item);
-                    
-                    // Mark as read logic could go here
-                    if(!data.read) hasNew = true; 
                 });
-                
-                if(!hasNew) document.getElementById('notif-badge').classList.add('hidden');
+                document.getElementById('notif-badge').classList.add('hidden');
             }
         }
         
@@ -733,9 +754,10 @@
             if(adminUnsubscribe) adminUnsubscribe();
 
             if(tab === 'home') renderEmployeeTable(content);
-            if(tab === 'attendance') renderAttendanceSummary(content);
+            if(tab === 'attendance') renderAttendanceLog(content);
             if(tab === 'work') renderWorkSummary(content);
             if(tab === 'salary') renderSalaryTab(content);
+            if(tab === 'holidays') renderHolidaysTab(content);
         }
 
         function renderEmployeeTable(container) {
@@ -767,6 +789,7 @@
                                 <button class="action-btn" onclick="toggleActionMenu('${emp.id}')">⋮</button>
                                 <div id="act-${emp.id}" class="action-dropdown">
                                     <div class="dropdown-item" onclick="editEmployee('${emp.id}')">Edit</div>
+                                    <div class="dropdown-item" onclick="openDayOffModal('${emp.id}')">Day Off</div>
                                     <div class="dropdown-item" onclick="openRatingModal('${emp.id}')">Rate</div>
                                     <div class="dropdown-item delete" onclick="deleteEmployee('${emp.id}')">Delete</div>
                                 </div>
@@ -777,6 +800,173 @@
                 html += `</tbody></table></div>`;
                 container.innerHTML = html;
             });
+        }
+
+        // --- Day Off Logic ---
+        window.openDayOffModal = function(id) {
+            const emp = localEmployeesCache.find(e => e.id === id);
+            if(!emp) return;
+            document.getElementById('dayoff-emp-id').value = id;
+            document.getElementById('dayoff-emp-name').value = emp.name;
+            // Default to today or tomorrow? Let's default to today for convenience
+            document.getElementById('dayoff-date').valueAsDate = new Date();
+            document.getElementById('dayoff-reason').value = '';
+            document.getElementById('dayoff-modal').classList.add('active');
+        }
+
+        window.saveDayOff = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('dayoff-emp-id').value;
+            const date = document.getElementById('dayoff-date').value;
+            const reason = document.getElementById('dayoff-reason').value;
+            
+            if(!id || !date) return;
+
+            await addDoc(collection(db, "dayOffs"), {
+                empId: id,
+                date,
+                reason,
+                timestamp: serverTimestamp()
+            });
+            showToast('Day Off Allotted');
+            closeModal();
+        }
+
+        // --- Attendance Log with Date Filter ---
+        async function renderAttendanceLog(container) {
+            const todayStr = new Date().toISOString().slice(0,10);
+            
+            let html = `
+            <div class="page-header">
+                <div class="page-title">Attendance Log</div>
+                <div class="form-group" style="margin-bottom:0; width:200px;">
+                    <input type="date" id="attendance-date-filter" class="form-control" value="${todayStr}" onchange="window.refreshAttendanceLog()">
+                </div>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th>Emp</th><th>In</th><th>Br.Out</th><th>Br.In</th><th>L.Out</th><th>L.In</th><th>Out</th><th>Work Hrs</th></tr>
+                    </thead>
+                    <tbody id="att-log-body">
+                        <tr><td colspan="8" style="text-align:center;">Select a date to view logs.</td></tr>
+                    </tbody>
+                </table>
+            </div>`;
+            container.innerHTML = html;
+            window.refreshAttendanceLog();
+        }
+
+        // Exposed global function to re-fetch table based on input date
+        window.refreshAttendanceLog = async function() {
+            const dateVal = document.getElementById('attendance-date-filter').value;
+            if(!dateVal) return;
+
+            const q = query(collection(db, "attendance"), where("date", "==", dateVal));
+            const snap = await getDocs(q);
+            const tbody = document.getElementById('att-log-body');
+            tbody.innerHTML = '';
+
+            if(snap.empty) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text-light);">No records found for this date.</td></tr>';
+                return;
+            }
+
+            snap.forEach(d => {
+                const r = d.data();
+                const emp = localEmployeesCache.find(e => e.id === r.empId);
+                const empName = emp ? emp.name : r.empId;
+                
+                // Recalculate hours safely
+                const start = r.checkIn ? r.checkIn.toDate() : null;
+                const end = r.checkOut ? r.checkOut.toDate() : null;
+                let workHrs = 0;
+
+                if(start && end) {
+                    const totalMs = end - start;
+                    let breakMs = 0;
+                    if(r.breakOut && r.breakIn) breakMs += (r.breakIn.toDate() - r.breakOut.toDate());
+                    if(r.lunchOut && r.lunchIn) breakMs += (r.lunchIn.toDate() - r.lunchOut.toDate());
+                    workHrs = (totalMs - breakMs) / 3600000;
+                }
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><strong>${empName}</strong></td>
+                    <td>${formatTime(r.checkIn)}</td>
+                    <td>${formatTime(r.breakOut)}</td>
+                    <td>${formatTime(r.breakIn)}</td>
+                    <td>${formatTime(r.lunchOut)}</td>
+                    <td>${formatTime(r.lunchIn)}</td>
+                    <td>${formatTime(r.checkOut)}</td>
+                    <td style="font-weight:bold;">${workHrs > 0 ? workHrs.toFixed(1) + 'h' : '-'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // --- Holiday Tab ---
+        async function renderHolidaysTab(container) {
+            let html = `
+            <div class="page-header">
+                <div class="page-title">Company Holidays</div>
+                <button class="btn btn-primary" onclick="openHolidayModal()">+ Add Holiday</button>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th>Date</th><th>Holiday Name</th><th>Action</th></tr>
+                    </thead>
+                    <tbody id="holiday-table-body">
+                        <tr><td colspan="3" style="text-align:center;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>`;
+            container.innerHTML = html;
+            const q = query(collection(db, "holidays"), orderBy("date", "desc"));
+            adminUnsubscribe = onSnapshot(q, (snap) => {
+                const tbody = document.getElementById('holiday-table-body');
+                tbody.innerHTML = '';
+                if (snap.empty) {
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-light);">No holidays added.</td></tr>';
+                    return;
+                }
+                snap.forEach(d => {
+                    const h = d.data();
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${h.date}</td>
+                        <td>${h.name}</td>
+                        <td>
+                            <button class="btn btn-outline" style="padding: 4px 10px; font-size: 0.8rem; color: var(--danger); border-color: var(--danger);" onclick="deleteHoliday('${d.id}')">Delete</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            });
+        }
+
+        window.openHolidayModal = function() {
+            document.getElementById('holiday-name').value = '';
+            document.getElementById('holiday-date').value = '';
+            document.getElementById('holiday-modal').classList.add('active');
+        }
+
+        window.saveHoliday = async function(e) {
+            e.preventDefault();
+            const name = document.getElementById('holiday-name').value;
+            const date = document.getElementById('holiday-date').value;
+            if(!name || !date) return;
+            await addDoc(collection(db, "holidays"), { name, date });
+            showToast('Holiday Added');
+            closeModal();
+        }
+
+        window.deleteHoliday = async function(id) {
+            if(confirm('Delete this holiday?')) {
+                await deleteDoc(doc(db, "holidays", id));
+                showToast('Holiday Deleted');
+            }
         }
 
         window.toggleActionMenu = function(id) {
@@ -884,28 +1074,7 @@
             showToast('Rating Submitted');
         }
 
-        // --- Summary Views (Fixed Glitch) ---
-        async function renderAttendanceSummary(container) {
-            const empSnap = await getDocs(collection(db, "employees"));
-            const attSnap = await getDocs(collection(db, "attendance"));
-            const leaveSnap = await getDocs(collection(db, "leaves"));
-
-            const employees = []; empSnap.forEach(d => employees.push({id: d.id, ...d.data()}));
-            const attendance = []; attSnap.forEach(d => attendance.push(d.data()));
-            const leaves = []; leaveSnap.forEach(d => leaves.push(d.data()));
-
-            let html = `<div class="page-header"><div class="page-title">Attendance Summary</div></div><div class="table-wrapper"><table><thead><tr><th>ID</th><th>Name</th><th>Presents</th><th>Leaves</th></tr></thead><tbody>`;
-            employees.forEach(emp => {
-                // Safety check: only count if attendance exists and has checkOut
-                const presents = attendance.filter(a => a.empId === emp.id && a.checkOut).length;
-                // Safety check: leaves status must be Approved
-                const leavesCount = leaves.filter(l => l.empId === emp.id && l.status === 'Approved').length;
-                html += `<tr><td>${emp.id}</td><td>${emp.name}</td><td>${presents}</td><td>${leavesCount}</td></tr>`;
-            });
-            html += `</tbody></table></div>`;
-            container.innerHTML = html;
-        }
-
+        // --- Summary Views ---
         async function renderWorkSummary(container) {
             const attSnap = await getDocs(collection(db, "attendance"));
             const attendance = []; attSnap.forEach(d => attendance.push({id: d.id, ...d.data()}));
@@ -921,7 +1090,6 @@
             let html = `<div class="page-header"><div class="page-title">Work Summary</div></div><div class="table-wrapper"><table><thead><tr><th>ID</th><th>Name</th><th>Work</th><th>Break</th><th>Late</th><th>OT</th></tr></thead><tbody>`;
             for (const [id, s] of Object.entries(summary)) {
                 const emp = localEmployeesCache.find(e => e.id === id);
-                // Safety check for emp name
                 const empName = emp ? emp.name : 'Unknown'; 
                 html += `<tr><td>${id}</td><td>${empName}</td><td>${s.work.toFixed(1)}h</td><td>${s.break.toFixed(1)}h</td><td style="color:${s.late?'red':'inherit'}">${s.late}</td><td>${s.ot.toFixed(1)}h</td></tr>`;
             }
@@ -944,7 +1112,6 @@
             localEmployeesCache.forEach(emp => {
                 const s = summary[emp.id] || { work:0, ot:0, late:0 };
                 const daysInMonth = 26; 
-                // Safety check for dutyHrs
                 const duty = emp.dutyHrs || 8; 
                 const hourlyRate = emp.salary / (daysInMonth * duty);
                 const standardPay = (s.work - s.ot) * hourlyRate;
@@ -967,31 +1134,55 @@
             document.getElementById('emp-shift-display').textContent = currentUser.shift === 'morning' ? 'Morning (8 AM)' : 'Evening (12 PM)';
             document.getElementById('emp-offday-display').textContent = currentUser.weeklyOff;
             
-            // Issue 2: Check location immediately on login
-            checkHolidayStatus(); // This will eventually call checkLocationStatus
+            checkHolidayStatus(); 
         }
 
         async function checkHolidayStatus() {
             const todayStr = new Date().toISOString().split('T')[0];
-            const q = query(collection(db, "holidays"), where("date", "==", todayStr));
-            const snap = await getDocs(q);
-            
             const statusEl = document.getElementById('location-status');
-            if(!snap.empty) {
+            isHoliday = false;
+            isSpecialDayOff = false;
+
+            // 1. Check Global Holidays
+            const hQ = query(collection(db, "holidays"), where("date", "==", todayStr));
+            const hSnap = await getDocs(hQ);
+            
+            if(!hSnap.empty) {
                 isHoliday = true;
-                const holidayName = snap.docs[0].data().name;
+                const holidayName = hSnap.docs[0].data().name;
                 statusEl.innerHTML = `<div class="status-badge status-holiday">🏖️ Today is ${holidayName} (Holiday)</div>`;
-            } else {
-                isHoliday = false;
-                checkLocationStatus();
+                setButtonStates();
+                return;
             }
+
+            // 2. Check Special Day Offs (New Logic)
+            const dQ = query(collection(db, "dayOffs"), where("empId", "==", currentUser.id), where("date", "==", todayStr));
+            const dSnap = await getDocs(dQ);
+
+            if(!dSnap.empty) {
+                isSpecialDayOff = true;
+                statusEl.innerHTML = `<div class="status-badge status-holiday">📅 Special Day Off Allotted</div>`;
+                setButtonStates();
+                return;
+            }
+
+            // 3. Check Weekly Off
+            const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+            if (todayDayName === currentUser.weeklyOff) {
+                 statusEl.innerHTML = `<div class="status-badge status-holiday">😴 Weekly Off Day</div>`;
+                 setButtonStates();
+                 return;
+            }
+
+            checkLocationStatus();
         }
 
         function checkLocationStatus() {
-            if(isHoliday) return;
+            if(isHoliday || isSpecialDayOff) return;
             if (!navigator.geolocation) {
                 document.getElementById('location-status').innerHTML = '<span class="status-fail status-badge">❌ Geo not supported</span>';
                 locationAllowed = false;
+                setButtonStates();
                 return;
             }
             navigator.geolocation.getCurrentPosition(
@@ -1012,7 +1203,7 @@
             );
         }
 
-        // Issue 3: Button Logic with Timestamps
+        // Issue 3: Button Logic with Timestamps & Evening Shift Fix
         async function setButtonStates() {
             const todayStr = new Date().toISOString().slice(0,10);
             const q = query(collection(db, "attendance"), where("empId", "==", currentUser.id), where("date", "==", todayStr));
@@ -1029,23 +1220,20 @@
                 out: document.getElementById('btn-check-out')
             };
 
-            // Reset all buttons to default state first
             Object.values(btns).forEach(b => {
                 b.disabled = true;
                 b.classList.remove('btn-primary', 'btn-danger');
                 b.classList.add('btn-outline');
-                b.innerHTML = b.getAttribute('data-original-text') || b.innerText; // Reset text if needed, but logic below overrides
+                b.innerHTML = b.getAttribute('data-original-text') || b.innerText; 
             });
 
-            // Handle Weekly Off / Holiday
-            if (todayDayName === currentUser.weeklyOff || isHoliday) {
-                const msg = isHoliday ? "Holiday" : "Weekly Off";
-                btns.in.textContent = msg;
+            // Handle Weekly Off / Holiday / Special Day Off
+            if (todayDayName === currentUser.weeklyOff || isHoliday || isSpecialDayOff) {
+                btns.in.textContent = "Day Off";
                 btns.in.disabled = true;
                 return;
             }
 
-            // Helper to set button to time
             const setBtnTime = (btn, time) => {
                 if (time) {
                     btn.textContent = formatTime(time);
@@ -1054,7 +1242,6 @@
                 }
             };
 
-            // Restore Default Labels for active buttons
             btns.in.textContent = "🟢 Check In";
             btns.in.className = 'btn btn-primary';
 
@@ -1065,23 +1252,30 @@
             btns.out.textContent = "🔴 Check Out";
             btns.out.className = 'btn btn-danger';
 
+            // Evening Shift Logic
+            if (currentUser.shift === 'evening') {
+                btns.bOut.disabled = true;
+                btns.bIn.disabled = true;
+                btns.bOut.textContent = "N/A (Evening)";
+                btns.bIn.textContent = "N/A (Evening)";
+            }
+
             if (!rec && locationAllowed) {
                 btns.in.disabled = false;
             } else if (rec) {
-                // Check In clicked
                 setBtnTime(btns.in, rec.checkIn);
                 
-                // Break Logic
-                if (!rec.breakOut && locationAllowed) btns.bOut.disabled = false;
-                else {
-                    setBtnTime(btns.bOut, rec.breakOut);
-                    if (!rec.breakIn && locationAllowed) btns.bIn.disabled = false;
+                if (currentUser.shift !== 'evening') {
+                    if (!rec.breakOut && locationAllowed) btns.bOut.disabled = false;
                     else {
-                        setBtnTime(btns.bIn, rec.breakIn);
+                        setBtnTime(btns.bOut, rec.breakOut);
+                        if (!rec.breakIn && locationAllowed) btns.bIn.disabled = false;
+                        else {
+                            setBtnTime(btns.bIn, rec.breakIn);
+                        }
                     }
                 }
 
-                // Lunch Logic
                 if (!rec.lunchOut && locationAllowed) btns.lOut.disabled = false;
                 else {
                     setBtnTime(btns.lOut, rec.lunchOut);
@@ -1091,7 +1285,6 @@
                     }
                 }
 
-                // Check Out Logic
                 if (!rec.checkOut && locationAllowed) btns.out.disabled = false;
                 else {
                     setBtnTime(btns.out, rec.checkOut);
@@ -1100,11 +1293,13 @@
         }
 
         window.handleAttendance = async function(type) {
-            // Issue 2: Enforce Location Check every time before action
             if(!locationAllowed) {
-                // Re-check location just in case status is stale
                 checkLocationStatus();
                 if(!locationAllowed) return showToast('Must be at store to perform this action!', 'error');
+            }
+
+            if (currentUser.shift === 'evening' && (type === 'breakOut' || type === 'breakIn')) {
+                return showToast('Break not allowed in Evening Shift', 'error');
             }
 
             const todayStr = new Date().toISOString().slice(0,10);
@@ -1132,7 +1327,6 @@
                 const docId = snap.docs[0].id;
                 const updateData = {};
                 
-                // Issue 3: Disable button immediately and show time (Optimistic UI)
                 const btnId = type === 'breakOut' ? 'btn-breakfast-out' :
                               type === 'breakIn' ? 'btn-breakfast-in' :
                               type === 'lunchOut' ? 'btn-lunch-out' :
@@ -1172,12 +1366,8 @@
             const reason = document.getElementById('leave-reason').value;
             if(!date || !reason) return showToast('Fill all fields', 'error');
             
-            // Issue 1: Save to DB
             await addDoc(collection(db, "leaves"), { empId: currentUser.id, date, reason, status: 'Pending' });
-            
-            // Issue 1: Send Notification with Reason Details
-            sendNotification(`Leave Request: ${currentUser.name}`, 'leave', `Date: ${date}. Reason: ${reason}`);
-            
+            sendNotification(`Leave Request: ${currentUser.name}`, 'leave', `Date: ${date}<br>Reason: ${reason}`);
             showToast('Request Sent');
             document.getElementById('leave-reason').value = '';
         }
@@ -1185,10 +1375,7 @@
         window.submitSuggestion = function() {
             const txt = document.getElementById('suggestion-text').value;
             if(!txt) return showToast('Write something', 'error');
-            
-            // Issue 1: Send Notification with Feedback Details
             sendNotification(`Feedback from ${currentUser.name}`, 'feedback', txt);
-            
             showToast('Sent');
             document.getElementById('suggestion-text').value = '';
         }
